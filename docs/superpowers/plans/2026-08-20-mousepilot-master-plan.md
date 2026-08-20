@@ -70,6 +70,12 @@
 - **本階段範圍：** 移動目標計算（純函式，可單元測試：輸入目前座標 + Virtual Screen Bounds + 模式 + 像素 → 輸出合法目標座標）、SendInput 送出、與 IdleDetectionService 的自我輸入隔離整合、使用者重新操作立即取消（規格 §6、§24）。
 - **測試項目：** 規格 §34 案例 5~12；目標計算純函式的邊界/負座標單元測試。
 - **風險：** SendInput 的座標正規化（0~65535 絕對座標 vs virtual desktop flag）在多螢幕 + DPI 下容易算錯，需以 Phase 0 spike 實測為準。
+- **硬性約束（Phase 2 final review / ledger 移交，計畫撰寫時必須逐條納入）：**
+  1. 抑制窗為單一覆蓋語意：一次 `Suppress` 必須涵蓋整個「移動＋返回」動作；若分兩次 Suppress，需保證兩次模擬輸入之間至少發生一次 Tick，否則前窗被覆蓋會把前一個模擬輸入誤判為真實輸入。
+  2. `MoveRequested`/`Ticked` 訂閱端不得拋例外（Phase 11 全域 handler 之前，例外會經 DispatcherTimer 傳播）。
+  3. `AutoMoving` 狀態目前無進入路徑（`IdleStateMachine.State` private set、Tick 只產生四種狀態）——需在狀態機新增進入/離開 API。
+  4. 「回原位置」的 100~500ms 等待落在兩次輪詢之間：執行返回移動前必須再讀一次 `GetLastInputInfo` 確認無真實輸入，取消不能只靠 500ms 輪詢（規格 §24 CancellationToken）。
+  5. 若實作「預期座標比對」防線，先修 `NativeMethods.GetCursorPosition` 失敗回 `(0,0)` 的 fallback（(0,0) 在多螢幕負座標下是合法座標，應改 nullable 或 last-known）。
 
 ## Phase 4：System Tray
 
@@ -89,6 +95,7 @@
 - **目標：** HotkeyService（RegisterHotKey）：預設 Ctrl+Alt+F9 啟停、Ctrl+Alt+F10 恢復游標；UI 可改快捷鍵；占用/無效/重複偵測與清楚錯誤。
 - **測試項目：** 規格 §34 案例 26、27。
 - **風險：** Hotkey 需要 HWND 訊息迴圈——掛在隱藏訊息視窗上，避免依賴 MainWindow 存在。
+- **移交事項（Phase 2 ledger）：** 本階段開始有程式改設定值 → AppSettings 需 INPC 化（或 VM 包裝屬性），順帶解決「StartMonitoring 的 Clamp 改值後 UI 不刷新」問題。
 
 ## Phase 7：Cursor Import（含內建圖案庫）
 
@@ -120,6 +127,7 @@
 - **目標：** LogService（`%AppData%\MousePilot\Logs\mousepilot.log`，5MB rotate 保留 3~5 份）；全域未處理例外 handler（記 log、恢復游標、不靜默吞掉）；規格 §21 各失敗情境的統一錯誤呈現（非侵入式）。回頭把前面各 Phase 的錯誤點接上 log。
 - **測試項目：** 規格 §34 案例 31；rotate 單元測試。
 - **風險：** 例外 handler 內再拋例外——handler 必須自身 try/catch 到底。
+- **移交事項（Phase 2 ledger）：** (a) `MonitorStatus` 需擴充 `Error` 值 + XAML 紅色狀態點（規格 §28）；(b) 全域 handler 必須涵蓋 Dispatcher 例外（DispatcherTimer 事件路徑目前無防護）。
 
 ## Phase 12：Publish + 文件交付
 
