@@ -237,13 +237,25 @@ public class IdleStateMachineTests
     }
 
     [Fact]
-    public void 抑制窗過期後的輸入仍視為真實使用者()
+    public void 抑制窗範圍外的輸入仍視為真實使用者()
     {
         var m = Started();
         m.Suppress(60_000, 1_000);                               // 窗 [60000, 61000]
-        var r = m.Tick(62_000, 61_800, Threshold, Interval);     // 窗已過期
+        var r = m.Tick(62_000, 61_800, Threshold, Interval);     // 輸入 tick 在窗範圍之後
         Assert.Equal(MonitorStatus.UserActive, r.State);
         Assert.Equal(0.2, r.IdleSeconds, 3);
+    }
+
+    [Fact]
+    public void 輪詢落在窗過期後時窗內殘留模擬輸入不被誤判為真實輸入()
+    {
+        var m = Started();
+        m.Tick(120_000, 0, Threshold, Interval);                 // 已觸發，進入自動週期
+        m.Suppress(120_000, 50);                                 // 模擬輸入前宣告 50ms 窗
+        var r = m.Tick(121_000, 120_010, Threshold, Interval);   // 模擬輸入記在窗內、輪詢在窗後
+        Assert.Equal(MonitorStatus.WaitingToStart, r.State);     // 自動週期未被誤取消
+        Assert.Equal(121.0, r.IdleSeconds);                      // 閒置未被重置
+        Assert.False(r.MoveRequested);
     }
 
     [Fact]
@@ -340,13 +352,13 @@ public sealed class IdleStateMachine
                 MonitorStatus.Paused, unchecked(nowTick - lastInputTick) / 1000.0, null, null, false);
         }
 
-        if (_suppressActive && (int)unchecked(nowTick - _suppressUntilTick) >= 0)
-        {
-            _suppressActive = false;
-        }
-
         if (lastInputTick != _lastRealInputTick)
         {
+            // 分類只看「值域」：lastInputTick 是否落在抑制窗範圍內。
+            // 不可用 nowTick 對窗做時間過期判斷——輪詢常落在窗結束之後，
+            // 窗內殘留的模擬輸入 tick 會被誤判為真實輸入（review 實測情境）。
+            // 舊窗的存留期在實務上由 Phase 3 每次移動前重新 Suppress 所取代，
+            // 且採納真實輸入時即作廢，不會存活到 24.8 天的繞回混疊範圍。
             var inWindow = _suppressActive
                 && (int)unchecked(lastInputTick - _suppressStartTick) >= 0
                 && (int)unchecked(_suppressUntilTick - lastInputTick) >= 0;
@@ -355,6 +367,7 @@ public sealed class IdleStateMachine
                 // 真實使用者輸入：取消自動週期、重新計時（規格 §6/§24 最高優先）
                 _lastRealInputTick = lastInputTick;
                 _autoCycleActive = false;
+                _suppressActive = false; // 真實輸入採納後，舊抑制窗作廢
             }
             // 抑制窗內：不採納，閒置基準維持 _lastRealInputTick
         }
@@ -397,7 +410,7 @@ public sealed class IdleStateMachine
 - [ ] **Step 4: 執行測試，確認通過**
 
 Run: `dotnet test tests/MousePilot.Tests`
-Expected: 全綠（36 + 12 = 48）。
+Expected: 全綠（36 + 13 = 49）。
 
 - [ ] **Step 5: Commit**
 
@@ -620,7 +633,7 @@ public sealed class IdleDetectionService : IDisposable
 - [ ] **Step 4: 執行測試，確認通過**
 
 Run: `dotnet test tests/MousePilot.Tests`
-Expected: 全綠（48 + 3 = 51）。
+Expected: 全綠（49 + 3 = 52）。
 
 注意：`Start()` 內含 `PollNow()`，測試「達門檻時發出MoveRequested事件」在 `Start()` 當下 now=0、idle=0 不會觸發，改 now=5000 後的 `PollNow()` 才觸發——如實驗證此順序。
 
@@ -940,7 +953,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 - [ ] **Step 4: 執行測試，確認通過**
 
 Run: `dotnet test tests/MousePilot.Tests`
-Expected: 全綠（Task 3 後 51 − 舊 VM 測試 10（5 fact + Task 1 的 5 theory 案例）+ 新 VM 測試 13（8 fact + 5 theory 案例）= 54）。若總數與此推算不同，以「無 FAIL、無 SKIP」為準並在報告說明計數。
+Expected: 全綠（Task 3 後 52 − 舊 VM 測試 10（5 fact + Task 1 的 5 theory 案例）+ 新 VM 測試 13（8 fact + 5 theory 案例）= 55）。若總數與此推算不同，以「無 FAIL、無 SKIP」為準並在報告說明計數。
 
 - [ ] **Step 5: Commit**
 
