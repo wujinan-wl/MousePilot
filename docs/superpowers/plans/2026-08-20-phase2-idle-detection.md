@@ -486,6 +486,31 @@ public class IdleDetectionServiceTests
     }
 
     [Fact]
+    public void 設定為0時不會每次輪詢都觸發()
+    {
+        uint now = 0;
+        var settings = new AppSettings();
+        settings.IdleStartSeconds = 0;          // 模擬 UI 未夾制輸入直接寫入
+        settings.MovementIntervalSeconds = 0;
+        using var service = new IdleDetectionService(settings, () => now, () => 0u, () => (0, 0));
+        var moves = 0;
+        service.MoveRequested += () => moves++;
+
+        service.Start();
+        now = 2_000;
+        service.PollNow();
+        Assert.Equal(0, moves);                 // 夾制後門檻至少 5 秒
+
+        now = 5_000;
+        service.PollNow();
+        Assert.Equal(1, moves);                 // 夾制後門檻 5 秒 → 觸發一次
+
+        now = 5_500;
+        service.PollNow();
+        Assert.Equal(1, moves);                 // 夾制後間隔至少 1 秒 → 0.5 秒不再觸發
+    }
+
+    [Fact]
     public void Suppress期間輸入變化不重置閒置()
     {
         uint now = 10_000;
@@ -616,9 +641,12 @@ public sealed class IdleDetectionService : IDisposable
 
     public void PollNow()
     {
+        // 就地夾制：TextBox 綁定會把未夾制的值直接寫進 Settings（AppSettings 無 INPC），
+        // 若不夾制，IdleStartSeconds=0 會造成每 500ms 觸發一次（final review Issue 1）
         var result = _machine.Tick(
             _tickProvider(), _lastInputProvider(),
-            _settings.IdleStartSeconds, _settings.MovementIntervalSeconds);
+            Math.Clamp(_settings.IdleStartSeconds, 5, 86400),
+            Math.Clamp(_settings.MovementIntervalSeconds, 1, 86400));
         Ticked?.Invoke(result, _cursorProvider());
         if (result.MoveRequested)
         {
