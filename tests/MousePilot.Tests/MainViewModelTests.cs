@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Xunit;
+using MousePilot.Models;
 using MousePilot.Services;
 using MousePilot.ViewModels;
 
@@ -71,5 +72,18 @@ public sealed class MainViewModelTests : IDisposable
 
         Assert.Null(ex);
         Assert.Contains("保存失敗", vm.Notice);
+    }
+
+    [Theory]
+    [InlineData(MonitorStatus.Paused, "已暫停")]
+    [InlineData(MonitorStatus.Monitoring, "監控中")]
+    [InlineData(MonitorStatus.UserActive, "使用者活動中")]
+    [InlineData(MonitorStatus.WaitingToStart, "等待啟動")]
+    [InlineData(MonitorStatus.AutoMoving, "自動移動中")]
+    public void StatusText由Status派生(MonitorStatus status, string expected)
+    {
+        var vm = new MainViewModel(new SettingsService(SettingsPath));
+        vm.Status = status;
+        Assert.Equal(expected, vm.StatusText);
     }
 }

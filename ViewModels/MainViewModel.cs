@@ -7,15 +7,6 @@ using MousePilot.Services;
 
 namespace MousePilot.ViewModels;
 
-public enum MonitorStatus
-{
-    Paused,
-    Monitoring,
-    UserActive,
-    WaitingToStart,
-    AutoMoving,
-}
-
 public partial class MainViewModel : ObservableObject
 {
     private readonly SettingsService _settingsService;
@@ -52,6 +43,16 @@ public partial class MainViewModel : ObservableObject
                 : $"設定檔損毀，已載入預設值（原檔備份：{result.BackupPath}）。";
         }
     }
+
+    partial void OnStatusChanged(MonitorStatus value) => StatusText = value switch
+    {
+        MonitorStatus.Paused => "已暫停",
+        MonitorStatus.Monitoring => "監控中",
+        MonitorStatus.UserActive => "使用者活動中",
+        MonitorStatus.WaitingToStart => "等待啟動",
+        MonitorStatus.AutoMoving => "自動移動中",
+        _ => value.ToString(),
+    };
 
     public void SaveSettings()
     {
