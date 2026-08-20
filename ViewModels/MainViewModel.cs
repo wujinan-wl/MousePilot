@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MousePilot.Models;
@@ -51,7 +53,18 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    public void SaveSettings() => _settingsService.Save(Settings);
+    public void SaveSettings()
+    {
+        try
+        {
+            _settingsService.Save(Settings);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            // 保存失敗不可讓程式 crash（規格 §21）；Phase 11 接上 LogService 後記錄
+            Notice = $"設定保存失敗：{ex.Message}";
+        }
+    }
 
     // Phase 2 接上 IdleDetectionService 後改為真實啟停邏輯與 CanExecute 條件
     [RelayCommand(CanExecute = nameof(CanStart))]

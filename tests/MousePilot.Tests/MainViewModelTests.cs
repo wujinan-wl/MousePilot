@@ -57,4 +57,19 @@ public sealed class MainViewModelTests : IDisposable
         Assert.False(vm.StartCommand.CanExecute(null));
         Assert.False(vm.PauseCommand.CanExecute(null));
     }
+
+    [Fact]
+    public void SaveSettings路徑不可寫時不擲例外並顯示提示()
+    {
+        // 把「應為目錄」的位置先建成一般檔案，使 CreateDirectory/寫入必定失敗
+        Directory.CreateDirectory(_dir);
+        var blockedDir = Path.Combine(_dir, "blocked");
+        File.WriteAllText(blockedDir, "occupy");
+        var vm = new MainViewModel(new SettingsService(Path.Combine(blockedDir, "settings.json")));
+
+        var ex = Record.Exception(() => vm.SaveSettings());
+
+        Assert.Null(ex);
+        Assert.Contains("保存失敗", vm.Notice);
+    }
 }
