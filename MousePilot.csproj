@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishReadyToRun>true</PublishReadyToRun>
+
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MousePilot</RootNamespace>
+    <AssemblyName>MousePilot</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+  </ItemGroup>
+
+  <!-- 測試與 spike 專案在子目錄，避免被主專案誤編 -->
+  <ItemGroup>
+    <Compile Remove="tests\**;spikes\**" />
+    <None Remove="tests\**;spikes\**" />
+    <Page Remove="tests\**;spikes\**" />
+  </ItemGroup>
+
+</Project>
