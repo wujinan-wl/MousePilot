@@ -11,6 +11,9 @@ publish/
 # 個人工作偏好（不公開）
 CLAUDE-preferences.md
 
+# Codex 本機複本（非本專案交付物）
+AGENTS.md
+
 # Python scaffold 殘留
 .venv/
 __pycache__/
