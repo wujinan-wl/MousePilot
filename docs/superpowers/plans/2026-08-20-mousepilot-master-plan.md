@@ -18,8 +18,8 @@
 
 | Phase | 名稱 | 狀態 | 細部計畫文件 |
 |-------|------|------|--------------|
-| 0 | 高風險技術驗證（Spike） | ⬜ 未開始 | `2026-08-20-phase0-phase1.md` |
-| 1 | 專案骨架：WPF + MVVM + Settings + Dashboard 殼 | ⬜ 未開始 | `2026-08-20-phase0-phase1.md` |
+| 0 | 高風險技術驗證（Spike） | ✅ 完成 | `2026-08-20-phase0-phase1.md` |
+| 1 | 專案骨架：WPF + MVVM + Settings + Dashboard 殼 | ✅ 完成 | `2026-08-20-phase0-phase1.md` |
 | 2 | Idle Detection | ⬜ 未開始 | （Phase 1 完成後撰寫） |
 | 3 | Mouse Movement | ⬜ 未開始 | 〃 |
 | 4 | System Tray | ⬜ 未開始 | 〃 |
