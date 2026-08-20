@@ -103,13 +103,25 @@ public class IdleStateMachineTests
     }
 
     [Fact]
-    public void 抑制窗過期後的輸入仍視為真實使用者()
+    public void 抑制窗範圍外的輸入仍視為真實使用者()
     {
         var m = Started();
         m.Suppress(60_000, 1_000);                               // 窗 [60000, 61000]
-        var r = m.Tick(62_000, 61_800, Threshold, Interval);     // 窗已過期
+        var r = m.Tick(62_000, 61_800, Threshold, Interval);     // 輸入 tick 在窗範圍之後
         Assert.Equal(MonitorStatus.UserActive, r.State);
         Assert.Equal(0.2, r.IdleSeconds, 3);
+    }
+
+    [Fact]
+    public void 輪詢落在窗過期後時窗內殘留模擬輸入不被誤判為真實輸入()
+    {
+        var m = Started();
+        m.Tick(120_000, 0, Threshold, Interval);                 // 已觸發，進入自動週期
+        m.Suppress(120_000, 50);                                 // 模擬輸入前宣告 50ms 窗
+        var r = m.Tick(121_000, 120_010, Threshold, Interval);   // 模擬輸入記在窗內、輪詢在窗後
+        Assert.Equal(MonitorStatus.WaitingToStart, r.State);     // 自動週期未被誤取消
+        Assert.Equal(121.0, r.IdleSeconds);                      // 閒置未被重置
+        Assert.False(r.MoveRequested);
     }
 
     [Fact]

@@ -61,13 +61,13 @@ public sealed class IdleStateMachine
                 MonitorStatus.Paused, unchecked(nowTick - lastInputTick) / 1000.0, null, null, false);
         }
 
-        if (_suppressActive && (int)unchecked(nowTick - _suppressUntilTick) >= 0)
-        {
-            _suppressActive = false;
-        }
-
         if (lastInputTick != _lastRealInputTick)
         {
+            // 分類只看「值域」：lastInputTick 是否落在抑制窗範圍內。
+            // 不可用 nowTick 對窗做時間過期判斷——輪詢常落在窗結束之後，
+            // 窗內殘留的模擬輸入 tick 會被誤判為真實輸入（review 實測情境）。
+            // 舊窗的存留期在實務上由 Phase 3 每次移動前重新 Suppress 所取代，
+            // 且採納真實輸入時即作廢，不會存活到 24.8 天的繞回混疊範圍。
             var inWindow = _suppressActive
                 && (int)unchecked(lastInputTick - _suppressStartTick) >= 0
                 && (int)unchecked(_suppressUntilTick - lastInputTick) >= 0;
@@ -76,6 +76,7 @@ public sealed class IdleStateMachine
                 // 真實使用者輸入：取消自動週期、重新計時（規格 §6/§24 最高優先）
                 _lastRealInputTick = lastInputTick;
                 _autoCycleActive = false;
+                _suppressActive = false; // 真實輸入採納後，舊抑制窗作廢
             }
             // 抑制窗內：不採納，閒置基準維持 _lastRealInputTick
         }
