@@ -29,27 +29,53 @@
                 <StackPanel>
                     <TextBlock Text="狀態" Style="{StaticResource CardTitle}"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                        <Ellipse Width="10" Height="10" VerticalAlignment="Center"
-                                 Fill="{StaticResource StatusPausedBrush}"/>
+                        <Ellipse Width="10" Height="10" VerticalAlignment="Center">
+                            <Ellipse.Style>
+                                <Style TargetType="Ellipse">
+                                    <Setter Property="Fill" Value="{StaticResource StatusPausedBrush}"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Status}" Value="Monitoring">
+                                            <Setter Property="Fill" Value="{StaticResource StatusRunningBrush}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Status}" Value="UserActive">
+                                            <Setter Property="Fill" Value="{StaticResource StatusRunningBrush}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Status}" Value="WaitingToStart">
+                                            <Setter Property="Fill" Value="{StaticResource StatusWaitingBrush}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Status}" Value="AutoMoving">
+                                            <Setter Property="Fill" Value="{StaticResource StatusWaitingBrush}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Ellipse.Style>
+                        </Ellipse>
                         <TextBlock Text="{Binding StatusText}" Margin="8,0,0,0"
                                    FontSize="16" FontWeight="SemiBold"/>
                     </StackPanel>
-                    <UniformGrid Columns="2" Rows="2">
+                    <UniformGrid Columns="2" Rows="3">
                         <TextBlock>
-                            <Run Text="閒置秒數："/><Run Text="{Binding IdleSeconds, Mode=OneWay}"/>
+                            <Run Text="閒置秒數："/><Run Text="{Binding IdleSeconds, Mode=OneWay, StringFormat={}{0:F0} 秒}"/>
                         </TextBlock>
                         <TextBlock>
                             <Run Text="滑鼠座標："/><Run Text="{Binding MousePosition, Mode=OneWay}"/>
                         </TextBlock>
-                        <TextBlock Text="距離觸發：—（Phase 2）"/>
+                        <TextBlock>
+                            <Run Text="距離第一次觸發："/><Run Text="{Binding FirstTriggerText, Mode=OneWay}"/>
+                        </TextBlock>
+                        <TextBlock>
+                            <Run Text="距離下一次移動："/><Run Text="{Binding NextMoveText, Mode=OneWay}"/>
+                        </TextBlock>
                         <TextBlock>
                             <Run Text="游標："/><Run Text="{Binding CursorStatusText, Mode=OneWay}"/>
+                        </TextBlock>
+                        <TextBlock>
+                            <Run Text="觸發次數："/><Run Text="{Binding TriggerCount, Mode=OneWay}"/>
                         </TextBlock>
                     </UniformGrid>
                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                         <Button Content="啟動 MousePilot" Command="{Binding StartCommand}"
-                                Padding="16,8" Margin="0,0,8,0"
-                                ToolTip="Phase 2 完成閒置偵測後啟用"/>
+                                Padding="16,8" Margin="0,0,8,0"/>
                         <Button Content="暫停" Command="{Binding PauseCommand}" Padding="16,8"/>
                     </StackPanel>
                 </StackPanel>
@@ -118,7 +144,7 @@
                               IsChecked="{Binding Settings.RunAtStartup}" Margin="0,0,0,6"/>
                     <CheckBox Content="啟動後最小化至系統匣（Phase 4 生效）"
                               IsChecked="{Binding Settings.StartMinimized}" Margin="0,0,0,6"/>
-                    <CheckBox Content="啟動程式後自動開始監控（Phase 2 生效）"
+                    <CheckBox Content="啟動程式後自動開始監控"
                               IsChecked="{Binding Settings.AutoStartMonitoring}"/>
                 </StackPanel>
             </Border>

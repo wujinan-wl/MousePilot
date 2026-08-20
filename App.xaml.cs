@@ -22,6 +22,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _mainViewModel?.SaveSettings();
+        _mainViewModel?.Dispose();
         base.OnExit(e);
     }
 }
