@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -7,11 +6,13 @@ using MousePilot.Services;
 
 namespace MousePilot.ViewModels;
 
-public partial class MainViewModel : ObservableObject
+public partial class MainViewModel : ObservableObject, IDisposable
 {
     private readonly SettingsService _settingsService;
 
     public AppSettings Settings { get; }
+
+    public IdleDetectionService IdleService { get; }
 
     [ObservableProperty]
     private MonitorStatus _status = MonitorStatus.Paused;
@@ -31,7 +32,18 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _notice = "";
 
-    public MainViewModel(SettingsService settingsService)
+    [ObservableProperty]
+    private string _firstTriggerText = "—";
+
+    [ObservableProperty]
+    private string _nextMoveText = "—";
+
+    [ObservableProperty]
+    private int _triggerCount;
+
+    public MainViewModel(
+        SettingsService settingsService,
+        Func<AppSettings, IdleDetectionService>? idleServiceFactory = null)
     {
         _settingsService = settingsService;
         var result = settingsService.Load();
@@ -42,17 +54,43 @@ public partial class MainViewModel : ObservableObject
                 ? "設定檔損毀，已載入預設值。"
                 : $"設定檔損毀，已載入預設值（原檔備份：{result.BackupPath}）。";
         }
+
+        IdleService = (idleServiceFactory ?? (s => new IdleDetectionService(s)))(Settings);
+        IdleService.Ticked += OnTicked;
+        IdleService.MoveRequested += OnMoveRequested;
+
+        if (Settings.AutoStartMonitoring)
+        {
+            StartMonitoring();
+        }
     }
 
-    partial void OnStatusChanged(MonitorStatus value) => StatusText = value switch
+    private void OnTicked(IdleTickResult result, (int X, int Y) cursor)
     {
-        MonitorStatus.Paused => "已暫停",
-        MonitorStatus.Monitoring => "監控中",
-        MonitorStatus.UserActive => "使用者活動中",
-        MonitorStatus.WaitingToStart => "等待啟動",
-        MonitorStatus.AutoMoving => "自動移動中",
-        _ => value.ToString(),
-    };
+        Status = result.State;
+        IdleSeconds = result.IdleSeconds;
+        MousePosition = $"X={cursor.X}, Y={cursor.Y}";
+        FirstTriggerText = result.SecondsUntilFirstTrigger is { } f ? $"{f:F0} 秒" : "—";
+        NextMoveText = result.SecondsUntilNextMove is { } n ? $"{n:F0} 秒" : "—";
+    }
+
+    // Phase 3 接上 MouseMovementService 執行實際移動；目前僅累計佔位事件
+    private void OnMoveRequested() => TriggerCount++;
+
+    partial void OnStatusChanged(MonitorStatus value)
+    {
+        StatusText = value switch
+        {
+            MonitorStatus.Paused => "已暫停",
+            MonitorStatus.Monitoring => "監控中",
+            MonitorStatus.UserActive => "使用者活動中",
+            MonitorStatus.WaitingToStart => "等待啟動",
+            MonitorStatus.AutoMoving => "自動移動中",
+            _ => value.ToString(),
+        };
+        StartCommand.NotifyCanExecuteChanged();
+        PauseCommand.NotifyCanExecuteChanged();
+    }
 
     public void SaveSettings()
     {
@@ -67,14 +105,21 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    // Phase 2 接上 IdleDetectionService 後改為真實啟停邏輯與 CanExecute 條件
-    [RelayCommand(CanExecute = nameof(CanStart))]
-    private void Start() { }
+    private void StartMonitoring()
+    {
+        Settings.Clamp();
+        IdleService.Start();
+    }
 
-    private bool CanStart() => false;
+    [RelayCommand(CanExecute = nameof(CanStart))]
+    private void Start() => StartMonitoring();
+
+    private bool CanStart() => Status == MonitorStatus.Paused;
 
     [RelayCommand(CanExecute = nameof(CanPause))]
-    private void Pause() { }
+    private void Pause() => IdleService.Pause();
 
-    private bool CanPause() => false;
+    private bool CanPause() => Status != MonitorStatus.Paused;
+
+    public void Dispose() => IdleService.Dispose();
 }
