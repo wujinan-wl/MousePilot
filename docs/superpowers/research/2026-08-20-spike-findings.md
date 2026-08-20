@@ -4,7 +4,7 @@
 
 **問題（規格 §36A）：** MousePilot 自己的 SendInput 模擬滑鼠移動是否會重置 GetLastInputInfo？
 
-**實測輸出：**（節錄自 `.superpowers/sdd/2026-08-20-phase0-phase1/spike-a-output.txt`，第 1-4 行）
+**實測輸出：**（節錄自 `docs/superpowers/research/spike-a-output.txt`，第 1-4 行）
 
 ```
 放開滑鼠鍵盤。閒置滿 5 秒時會送出一次 SendInput 相對移動 3px。
@@ -29,7 +29,7 @@ SendInput 呼叫前，`GetLastInputInfo` 讀到的 idle 已累積至 `8453 ms`�
 
 **問題（規格 §36B）：** 自訂游標替換後能否可靠恢復使用者原本的 cursor scheme？
 
-**測試矩陣結果：**（來源：`.superpowers/sdd/2026-08-20-phase0-phase1/spike-b-output.txt`）
+**測試矩陣結果：**（來源：`docs/superpowers/research/spike-b-output.txt`）
 
 | 情境 | 結果 |
 |------|------|

@@ -1,0 +1,80 @@
+Spike B — CursorSpike 測試矩陣輸出紀錄
+執行環境：Windows 11 Pro, PowerShell, .NET SDK 8, 使用者實機
+執行順序：依安全原則，先跑 --restore-only 冒煙，再跑正常流程，最後模擬 crash + 補救。
+
+======================================================================
+情境 1：恢復路徑冒煙測試（游標尚未被改動時執行，確認無副作用）
+命令：cmd /c "spikes\CursorSpike\bin\Debug\net8.0\CursorSpike.exe --restore-only"
+------------------------------------------------------------
+EXITCODE:0
+SPI_SETCURSORS 恢復：True
+------------------------------------------------------------
+結果：SystemParametersInfo(SPI_SETCURSORS) 回傳 True，process 正常結束（exit code 0）。
+無法目視游標本身在此次執行前後有無變化（游標本就未被替換），但呼叫本身無副作用、無例外。
+
+======================================================================
+情境 2：正常流程（替換 → 5 秒 → 自動恢復）
+命令：cmd /c "echo. | spikes\CursorSpike\bin\Debug\net8.0\CursorSpike.exe"
+（以 echo. 透過 stdin 自動送出 Enter，取代人工按鍵）
+------------------------------------------------------------
+EXITCODE:0
+DURATION_SEC:5.0819716
+按 Enter 後：標準箭頭 → 十字游標 5 秒 → SPI_SETCURSORS 恢復。
+SetSystemCursor：True
+SPI_SETCURSORS 恢復：True
+請目視確認箭頭游標已恢復原狀。
+------------------------------------------------------------
+結果：
+- SetSystemCursor(OCR_NORMAL) 回傳 True（替換成功）。
+- 執行耗時約 5.08 秒，與 Thread.Sleep(5000) 相符，證明期間游標確實維持在替換狀態。
+- SystemParametersInfo(SPI_SETCURSORS) 自動恢復回傳 True，process 正常結束（exit code 0）。
+- 註記：本次為 agent 自動化執行（stdin 重導），agent 無畫面存取能力，無法「目視」確認箭頭游標外觀，
+  僅能依 API 回傳值（皆為 True）與 process 正常結束佐證恢復成功。此為本報告已知限制，如實記錄，不編造目視結果。
+
+======================================================================
+情境 3：模擬 crash（十字游標顯示期間強制終止 process，不讓它自動恢復）→ 立即補救
+方法：
+  1. PowerShell Start-Process 啟動 CursorSpike.exe，stdin 重導向含一個換行的檔案（等同自動按 Enter）。
+  2. 等待 2 秒（此時已過 ReadLine 與 SetSystemCursor，但尚未到 5 秒的 Thread.Sleep 結束，process 仍在跑）。
+  3. Stop-Process -Force 強制終止 process。
+  4. 立即執行 --restore-only 補救。
+
+Part A（啟動 + 等待 + 強制終止）：
+------------------------------------------------------------
+STARTED PID:33660 AT:2026-08-20T16:28:49.8743105+08:00
+BEFORE-KILL StillRunning:True AT:2026-08-20T16:28:51.8898867+08:00
+KILLED PID:33660 AT:2026-08-20T16:28:51.8926418+08:00
+--- stdout captured before kill ---
+按 Enter 後：標準箭頭 → 十字游標 5 秒 → SPI_SETCURSORS 恢復。
+SetSystemCursor：True
+------------------------------------------------------------
+觀察：process 在強制終止前已印出 "SetSystemCursor：True"（游標已被替換為十字），
+但尚未印出 "SPI_SETCURSORS 恢復" 那一行，代表尚未執行到自動恢復、process 就已被強制終止（PID 33660，
+啟動後約 2.02 秒即終止，早於程式內建的 5 秒等待）。此時游標理論上停留在十字狀態（無法目視確認，
+但依 stdout 內容與 process 存活時間可推斷尚未恢復）。
+
+Part B（立即補救）：
+命令：cmd /c "spikes\CursorSpike\bin\Debug\net8.0\CursorSpike.exe --restore-only"
+------------------------------------------------------------
+REMEDIATION EXITCODE:0
+SPI_SETCURSORS 恢復：True
+------------------------------------------------------------
+結果：補救執行的 SystemParametersInfo(SPI_SETCURSORS) 回傳 True，process 正常結束（exit code 0）。
+依此推斷游標已恢復。（agent 無法目視確認，僅依 API 回傳值佐證，如實記錄此限制。）
+
+======================================================================
+情境 4：非預設 cursor scheme 下的恢復驗證
+狀態：未測試（無法確認使用者目前的 cursor scheme 設定，agent 無法安全地變更使用者的游標配置方案
+去建立此測試情境，且不應猜測使用者的 scheme。此列如實標記為未測試。）
+
+======================================================================
+最終安全確認：測試矩陣全部完成後，再額外執行一次 --restore-only 作為最後保險
+命令：cmd /c "spikes\CursorSpike\bin\Debug\net8.0\CursorSpike.exe --restore-only"
+------------------------------------------------------------
+FINAL-SAFETY-RESTORE EXITCODE:0
+SPI_SETCURSORS 恢復：True
+------------------------------------------------------------
+結論：所有測試結束後，最後一次執行的 API 呼叫回傳 SPI_SETCURSORS 恢復：True，exit code 0。
+截至本檔案撰寫完成時，未再對游標做任何變更，游標應已處於（使用者原本的）恢復狀態。
+
+
