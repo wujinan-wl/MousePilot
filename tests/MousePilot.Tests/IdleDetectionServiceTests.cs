@@ -60,4 +60,29 @@ public class IdleDetectionServiceTests
         Assert.Equal(10.4, seen!.Value.IdleSeconds);
         Assert.Equal(MonitorStatus.Monitoring, seen.Value.State);
     }
+
+    [Fact]
+    public void 設定為0時不會每次輪詢都觸發()
+    {
+        uint now = 0;
+        var settings = new AppSettings();
+        settings.IdleStartSeconds = 0;          // 模擬 UI 未夾制輸入直接寫入
+        settings.MovementIntervalSeconds = 0;
+        using var service = new IdleDetectionService(settings, () => now, () => 0u, () => (0, 0));
+        var moves = 0;
+        service.MoveRequested += () => moves++;
+
+        service.Start();
+        now = 2_000;
+        service.PollNow();
+        Assert.Equal(0, moves);                 // 夾制後門檻至少 5 秒
+
+        now = 5_000;
+        service.PollNow();
+        Assert.Equal(1, moves);                 // 夾制後門檻 5 秒 → 觸發一次
+
+        now = 5_500;
+        service.PollNow();
+        Assert.Equal(1, moves);                 // 夾制後間隔至少 1 秒 → 0.5 秒不再觸發
+    }
 }

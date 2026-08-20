@@ -56,9 +56,12 @@ public sealed class IdleDetectionService : IDisposable
 
     public void PollNow()
     {
+        // 就地夾制：TextBox 綁定會把未夾制的值直接寫進 Settings（AppSettings 無 INPC），
+        // 若不夾制，IdleStartSeconds=0 會造成每 500ms 觸發一次（final review Issue 1）
         var result = _machine.Tick(
             _tickProvider(), _lastInputProvider(),
-            _settings.IdleStartSeconds, _settings.MovementIntervalSeconds);
+            Math.Clamp(_settings.IdleStartSeconds, 5, 86400),
+            Math.Clamp(_settings.MovementIntervalSeconds, 1, 86400));
         Ticked?.Invoke(result, _cursorProvider());
         if (result.MoveRequested)
         {
