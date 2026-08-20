@@ -1,0 +1,38 @@
+# 推送 v* tag 時：建置單一 EXE 並發佈 GitHub Release（附加 MousePilot.exe）
+# 發布流程：更新 VERSION/CHANGELOG → 本地建 tag vX.Y.Z → git push origin main --tags
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore MousePilot.csproj
+
+      - name: Test
+        run: dotnet test tests/MousePilot.Tests --configuration Release
+
+      - name: Publish single EXE
+        run: dotnet publish MousePilot.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bin/Release/net8.0-windows/win-x64/publish/MousePilot.exe
+          generate_release_notes: true

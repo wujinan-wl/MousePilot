@@ -1,0 +1,19 @@
+# Build
+bin/
+obj/
+publish/
+
+# IDE
+.vs/
+.idea/
+*.user
+
+# 個人工作偏好（不公開）
+CLAUDE-preferences.md
+
+# Python scaffold 殘留
+.venv/
+__pycache__/
+
+# 本機暫存
+*.log
