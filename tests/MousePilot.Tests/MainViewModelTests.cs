@@ -53,7 +53,8 @@ public sealed class MainViewModelTests : IDisposable
                 correctPosition: (_, _) => true,
                 lastInputProvider: () => 0u,
                 delay: (_, _) => Task.CompletedTask,
-                randomIndexProvider: () => 3));
+                randomIndexProvider: () => 3),
+            new NoOpStartupService());
     }
 
     [Fact]
@@ -88,7 +89,8 @@ public sealed class MainViewModelTests : IDisposable
                     ct.ThrowIfCancellationRequested(); // 修正前會在此擲出（被誤取消）
                     return Task.CompletedTask;
                 },
-                randomIndexProvider: () => 3));
+                randomIndexProvider: () => 3),
+            new NoOpStartupService());
         vmRef = vm;
         return vm;
     }
@@ -187,7 +189,9 @@ public sealed class MainViewModelTests : IDisposable
         Directory.CreateDirectory(_dir);
         File.WriteAllText(SettingsPath, "{\"autoStartMonitoring\": true, \"idleStartSeconds\": 5}");
         var vm = new MainViewModel(new SettingsService(SettingsPath),
-            s => new IdleDetectionService(s, () => clock.Now, () => clock.LastInput, () => null));
+            s => new IdleDetectionService(s, () => clock.Now, () => clock.LastInput, () => null),
+            null,
+            new NoOpStartupService());
         vm.IdleService.PollNow();
         Assert.Equal("—", vm.MousePosition);
     }
@@ -225,7 +229,9 @@ public sealed class MainViewModelTests : IDisposable
         File.WriteAllText(SettingsPath, "{ broken");
 
         var vm = new MainViewModel(new SettingsService(SettingsPath),
-            s => new IdleDetectionService(s, () => 0u, () => 0u, () => (0, 0)));
+            s => new IdleDetectionService(s, () => 0u, () => 0u, () => (0, 0)),
+            null,
+            new NoOpStartupService());
 
         Assert.Contains("預設值", vm.Notice);
         Assert.Equal(120, vm.Settings.IdleStartSeconds);
@@ -250,7 +256,9 @@ public sealed class MainViewModelTests : IDisposable
         var blockedDir = Path.Combine(_dir, "blocked");
         File.WriteAllText(blockedDir, "occupy");
         var vm = new MainViewModel(new SettingsService(Path.Combine(blockedDir, "settings.json")),
-            s => new IdleDetectionService(s, () => 0u, () => 0u, () => (0, 0)));
+            s => new IdleDetectionService(s, () => 0u, () => 0u, () => (0, 0)),
+            null,
+            new NoOpStartupService());
 
         var ex = Record.Exception(() => vm.SaveSettings());
 
@@ -267,6 +275,17 @@ public sealed class MainViewModelTests : IDisposable
         public override bool Disable() => false;
 
         public override bool? IsEnabled() => null;
+    }
+
+    private sealed class NoOpStartupService : StartupService
+    {
+        public NoOpStartupService() : base(@"C:\Apps\MousePilot.exe", @"Software\MousePilotTests\noop\Run") { }
+
+        public override bool Enable() => true;
+
+        public override bool Disable() => true;
+
+        public override bool? IsEnabled() => false; // 未註冊、不碰任何 Registry
     }
 
     private string _startupTestRoot = "";
