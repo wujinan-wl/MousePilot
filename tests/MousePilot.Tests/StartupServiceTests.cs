@@ -3,11 +3,14 @@ using MousePilot.Services;
 
 namespace MousePilot.Tests;
 
+[Collection("RealRunKeyCanary")]
 public sealed class StartupServiceTests : IDisposable
 {
     private readonly string _testRoot = @"Software\MousePilotTests\" + Guid.NewGuid().ToString("N");
 
     private string RunKeyPath => _testRoot + @"\Run";
+
+    private string ApprovedKeyPath => _testRoot + @"\StartupApproved";
 
     public void Dispose()
     {
@@ -21,7 +24,7 @@ public sealed class StartupServiceTests : IDisposable
     }
 
     private StartupService Create(string exePath = @"C:\Apps\MousePilot.exe")
-        => new(exePath, RunKeyPath);
+        => new(exePath, RunKeyPath, "MousePilot", ApprovedKeyPath);
 
     [Fact]
     public void Enable寫入引號包覆的EXE路徑()
@@ -65,7 +68,7 @@ public sealed class StartupServiceTests : IDisposable
     [Fact]
     public void EXE路徑為空時Enable失敗不擲例外()
     {
-        var service = new StartupService("", RunKeyPath);
+        var service = new StartupService("", RunKeyPath, "MousePilot", ApprovedKeyPath);
         Assert.False(service.Enable());
         Assert.False(service.IsEnabled());
     }
@@ -78,5 +81,51 @@ public sealed class StartupServiceTests : IDisposable
 
         using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath);
         Assert.Equal("\"D:\\New\\MousePilot.exe\"", key!.GetValue("MousePilot"));
+    }
+
+    [Fact]
+    public void 工作管理員停用旗標時IsEnabled為false()
+    {
+        var service = Create();
+        service.Enable();
+        using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(ApprovedKeyPath))
+        {
+            key.SetValue("MousePilot", new byte[] { 0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
+        }
+
+        Assert.False(service.IsEnabled());
+    }
+
+    [Fact]
+    public void Enable清除停用旗標()
+    {
+        var service = Create();
+        service.Enable();
+        using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(ApprovedKeyPath))
+        {
+            key.SetValue("MousePilot", new byte[] { 0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
+        }
+
+        Assert.True(service.Enable());
+
+        Assert.True(service.IsEnabled());
+        using var approved = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(ApprovedKeyPath);
+        Assert.Null(approved?.GetValue("MousePilot"));
+    }
+
+    [Fact]
+    public void Disable清除停用旗標()
+    {
+        var service = Create();
+        service.Enable();
+        using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(ApprovedKeyPath))
+        {
+            key.SetValue("MousePilot", new byte[] { 0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
+        }
+
+        Assert.True(service.Disable());
+
+        using var approved = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(ApprovedKeyPath);
+        Assert.Null(approved?.GetValue("MousePilot"));
     }
 }

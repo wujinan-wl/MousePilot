@@ -9,6 +9,7 @@ using MousePilot.ViewModels;
 
 namespace MousePilot.Tests;
 
+[Collection("RealRunKeyCanary")]
 public sealed class MainViewModelTests : IDisposable
 {
     private sealed class TestClock
@@ -275,6 +276,30 @@ public sealed class MainViewModelTests : IDisposable
         public override bool Disable() => false;
 
         public override bool? IsEnabled() => null;
+    }
+
+    private sealed class DisableFailsStartupService : StartupService
+    {
+        public DisableFailsStartupService() : base(@"C:\Apps\MousePilot.exe", @"Software\MousePilotTests\unused\Run") { }
+
+        public override bool Enable() => true;
+
+        public override bool Disable() => false;
+
+        public override bool? IsEnabled() => true; // 已註冊 → ctor 同步回填 true
+    }
+
+    [Fact]
+    public void 取消勾選失敗時顯示提示且維持勾選()
+    {
+        var vm = CreateVmWithStartup(new DisableFailsStartupService());
+        Assert.True(vm.Settings.RunAtStartup); // ctor 同步回填
+
+        vm.RunAtStartup = false;
+
+        Assert.True(vm.Settings.RunAtStartup);
+        Assert.True(vm.RunAtStartup);
+        Assert.Contains("開機自動啟動", vm.Notice);
     }
 
     private sealed class NoOpStartupService : StartupService

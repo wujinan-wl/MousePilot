@@ -74,7 +74,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
             Settings.RunAtStartup = registered;
             if (registered)
             {
-                _startupService.Enable();
+                if (!_startupService.Enable())
+                {
+                    Notice = "開機自動啟動路徑修復失敗，請重新勾選一次。";
+                }
             }
         }
 
@@ -184,8 +187,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             else
             {
                 Notice = value
-                    ? "無法寫入開機自動啟動設定（Registry 存取被拒）。"
-                    : "無法移除開機自動啟動設定（Registry 存取被拒）。";
+                    ? "無法寫入開機自動啟動設定。"
+                    : "無法移除開機自動啟動設定。";
             }
 
             OnPropertyChanged(); // 失敗時 getter 仍回舊值 → checkbox 還原
