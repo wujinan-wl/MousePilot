@@ -96,8 +96,39 @@ public static class CursorImageProcessor
     private static Bitmap ToArgb(Bitmap source)
     {
         var clone = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
+        if (source.PixelFormat == PixelFormat.Format32bppArgb)
+        {
+            // 同格式：位元組直拷，完全繞過 GDI+ 繪製管線的 premultiply 取整（review 修正）
+            var srcData = source.LockBits(
+                new Rectangle(0, 0, source.Width, source.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            try
+            {
+                var dstData = clone.LockBits(
+                    new Rectangle(0, 0, clone.Width, clone.Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+                try
+                {
+                    var row = new byte[source.Width * 4];
+                    for (var y = 0; y < source.Height; y++)
+                    {
+                        Marshal.Copy(srcData.Scan0 + (y * srcData.Stride), row, 0, row.Length);
+                        Marshal.Copy(row, 0, dstData.Scan0 + (y * dstData.Stride), row.Length);
+                    }
+                }
+                finally
+                {
+                    clone.UnlockBits(dstData);
+                }
+            }
+            finally
+            {
+                source.UnlockBits(srcData);
+            }
+
+            return clone;
+        }
+
         using var g = Graphics.FromImage(clone);
-        g.CompositingMode = CompositingMode.SourceCopy; // 原值複製，杜絕半透明像素經 SourceOver 混合的取整失真（review 加固）
+        g.CompositingMode = CompositingMode.SourceCopy; // 非 32bppArgb 來源：SourceCopy 繪製轉換
         g.DrawImageUnscaled(source, 0, 0);
         return clone;
     }

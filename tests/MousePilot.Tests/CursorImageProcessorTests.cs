@@ -95,11 +95,37 @@ public class CursorImageProcessorTests
     }
 
     [Fact]
-    public void 半透明像素經裁切不失真()
+    public void 半透明像素經裁切位元組無損()
     {
-        using var src = MakeBitmap(3, 3, b => b.SetPixel(1, 1, Color.FromArgb(128, 200, 100, 50)));
+        using var src = new Bitmap(3, 3, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        var data = src.LockBits(new Rectangle(0, 0, 3, 3),
+            System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        try
+        {
+            var pixel = new byte[] { 50, 100, 200, 128 }; // BGRA @ (1,1)
+            System.Runtime.InteropServices.Marshal.Copy(pixel, 0, data.Scan0 + data.Stride + 4, 4);
+        }
+        finally
+        {
+            src.UnlockBits(data);
+        }
+
         using var trimmed = CursorImageProcessor.TrimTransparent(src);
-        Assert.Equal(Color.FromArgb(128, 200, 100, 50).ToArgb(), trimmed.GetPixel(0, 0).ToArgb());
+
+        Assert.Equal(1, trimmed.Width);
+        Assert.Equal(1, trimmed.Height);
+        var outData = trimmed.LockBits(new Rectangle(0, 0, 1, 1),
+            System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        try
+        {
+            var outPixel = new byte[4];
+            System.Runtime.InteropServices.Marshal.Copy(outData.Scan0, outPixel, 0, 4);
+            Assert.Equal(new byte[] { 50, 100, 200, 128 }, outPixel);
+        }
+        finally
+        {
+            trimmed.UnlockBits(outData);
+        }
     }
 
     [Fact]
