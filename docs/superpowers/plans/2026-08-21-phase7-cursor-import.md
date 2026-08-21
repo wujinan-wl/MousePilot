@@ -644,7 +644,7 @@ public static class CurFileFormat
                 return null;
             }
 
-            return FindIconChunk(data, 12, data.Length);
+            return FindIconChunk(data, 12, data.Length, depth: 0);
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or IndexOutOfRangeException)
         {
@@ -652,8 +652,13 @@ public static class CurFileFormat
         }
     }
 
-    private static (CurImage Info, Bitmap Image)? FindIconChunk(byte[] data, int start, int end)
+    private static (CurImage Info, Bitmap Image)? FindIconChunk(byte[] data, int start, int end, int depth)
     {
+        if (depth > 8)
+        {
+            return null; // 惡意深巢狀 LIST 防護：StackOverflowException 不可捕捉，必須用深度上限（review 修正）
+        }
+
         var pos = start;
         while (pos + 8 <= end)
         {
@@ -671,7 +676,7 @@ public static class CurFileFormat
 
             if (id == "LIST" && size >= 4)
             {
-                var inner = FindIconChunk(data, pos + 12, pos + 8 + size);
+                var inner = FindIconChunk(data, pos + 12, pos + 8 + size, depth + 1);
                 if (inner is not null)
                 {
                     return inner;
@@ -1181,7 +1186,8 @@ public static class CursorGallery
         using var antenna = new SolidBrush(Color.FromArgb(220, 38, 38));
         g.FillEllipse(antenna, 14.4f, 0, 3.2f, 3.2f);
         using var head = new GraphicsPath();
-        head.AddPath(RoundedRect(5, 6, 22, 20, 4), false);
+        using var headRect = RoundedRect(5, 6, 22, 20, 4); // 回傳的 path 也需釋放（review 修正）
+        head.AddPath(headRect, false);
         using var gray = new SolidBrush(Color.FromArgb(203, 213, 225));
         FillAndOutline(g, gray, head);
         using var eye = new SolidBrush(Color.FromArgb(37, 99, 235));
