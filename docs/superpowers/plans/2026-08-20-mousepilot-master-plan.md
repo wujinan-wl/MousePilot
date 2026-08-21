@@ -76,6 +76,10 @@
   3. `AutoMoving` 狀態目前無進入路徑（`IdleStateMachine.State` private set、Tick 只產生四種狀態）——需在狀態機新增進入/離開 API。
   4. 「回原位置」的 100~500ms 等待落在兩次輪詢之間：執行返回移動前必須再讀一次 `GetLastInputInfo` 確認無真實輸入，取消不能只靠 500ms 輪詢（規格 §24 CancellationToken）。
   5. 若實作「預期座標比對」防線，先修 `NativeMethods.GetCursorPosition` 失敗回 `(0,0)` 的 fallback（(0,0) 在多螢幕負座標下是合法座標，應改 nullable 或 last-known）。
+- **已知限制（Phase 3 final review 記錄，屬抑制窗架構固有的接受成本）：**
+  1. 孤立的單次真實輸入若 tick 恰落在 ≤500ms 抑制窗內，不會觸發「重新計時」（GetLastInputInfo 只保留最新 tick）——使用者不受干擾（返回仍會被雙重防線放棄），但自動週期會多跑一次；持續操作則在窗結束後 ≤500ms 內被正常採納。
+  2. Suppress 餘裕 200ms：若 UI thread 卡頓使返回移動晚於窗尾送出，該模擬輸入會被誤採納為真實輸入 → 週期靜默重啟（失敗方向保守：絕不多動滑鼠，只會多等）。列入實機觀察點。
+  3. 「自動移動中」狀態通常在兩次輪詢之間就結束（300ms vs 500ms），UI 上稍縱即逝——非 bug。
 
 ## Phase 4：System Tray
 
@@ -128,6 +132,7 @@
 - **測試項目：** 規格 §34 案例 31；rotate 單元測試。
 - **風險：** 例外 handler 內再拋例外——handler 必須自身 try/catch 到底。
 - **移交事項（Phase 2 ledger）：** (a) `MonitorStatus` 需擴充 `Error` 值 + XAML 紅色狀態點（規格 §28）；(b) 全域 handler 必須涵蓋 Dispatcher 例外（DispatcherTimer 事件路徑目前無防護）。
+- **移交事項（Phase 3 ledger）：** (c) `MouseMovementService.ExecuteMoveAsync` 回傳 bare bool，無法區分「取消/Win32 失敗/保守放棄」——接 log 時需改 reason enum 或注入 log callback（簽章變更要規劃，不要現場發現）；(d) VM `_moving` 防重入的靜默丟棄應記 log。
 
 ## Phase 12：Publish + 文件交付
 
