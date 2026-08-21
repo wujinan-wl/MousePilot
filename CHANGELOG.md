@@ -19,3 +19,4 @@
 - 系統匣（Phase 4）：tray icon 與右鍵選單（開啟/啟動/暫停/立即執行一次/游標佔位三項/設定/結束）、雙擊開 Dashboard、關閉視窗縮到系統匣（可設定）、啟動後最小化到系統匣（預設）、安全結束流程。
 - 開機自動啟動（Phase 5）：checkbox 寫入/移除 HKCU Run key（引號包覆 EXE 路徑）、啟動時與 Registry 實際狀態同步並自我修復移動後的路徑、寫入失敗不 crash（提示 + checkbox 還原）。
 - 全域快捷鍵（Phase 6）：Ctrl+Alt+F9 切換啟動/暫停、Ctrl+Alt+F10 恢復游標（佔位，隨自訂游標功能啟用）；UI 點擊欄位按鍵即可修改，無效/重複/被占用皆有提示並還原；Tray 選單啟停加上狀態防護。
+- 游標匯入（Phase 7）：支援 PNG/JPG/JPEG/BMP/CUR/ANI 匯入至 %AppData%\MousePilot\Cursors\（透明裁切/等比縮放/JPG 去背/.cur 讀寫/ANI 首格預覽，損毀不 crash）；16 個程式繪製內建圖案（基本 8 + 可愛 8，含藍色機器貓風格）；收藏資料層。
