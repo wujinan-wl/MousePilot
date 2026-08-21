@@ -97,47 +97,9 @@ public class CursorImageProcessorTests
     [Fact]
     public void 半透明像素經裁切不失真()
     {
-        const byte ExpectedB = 50, ExpectedG = 100, ExpectedR = 200, ExpectedA = 128;
-        using var src = MakeBitmap(3, 3, b =>
-        {
-            // Use LockBits to set exact pixel value
-            var data = b.LockBits(new System.Drawing.Rectangle(0, 0, b.Width, b.Height),
-                System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-            try
-            {
-                var bytes = new byte[data.Stride * b.Height];
-                // Set pixel (1,1) to BGRA: B=50, G=100, R=200, A=128
-                var idx = (1 * data.Stride) + (1 * 4);
-                bytes[idx + 0] = ExpectedB;
-                bytes[idx + 1] = ExpectedG;
-                bytes[idx + 2] = ExpectedR;
-                bytes[idx + 3] = ExpectedA;
-                System.Runtime.InteropServices.Marshal.Copy(bytes, 0, data.Scan0, bytes.Length);
-            }
-            finally
-            {
-                b.UnlockBits(data);
-            }
-        });
+        using var src = MakeBitmap(3, 3, b => b.SetPixel(1, 1, Color.FromArgb(128, 200, 100, 50)));
         using var trimmed = CursorImageProcessor.TrimTransparent(src);
-        // Use LockBits to read back pixel value directly
-        var trimData = trimmed.LockBits(new System.Drawing.Rectangle(0, 0, trimmed.Width, trimmed.Height),
-            System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-        try
-        {
-            var trimBytes = new byte[trimData.Stride * trimmed.Height];
-            System.Runtime.InteropServices.Marshal.Copy(trimData.Scan0, trimBytes, 0, trimBytes.Length);
-            // Verify pixel (0,0) = BGRA with SourceCopy compositing preserving values
-            // (允許 ±1 取整誤差 - GDI+ Clone 可能有輕微色彩空間轉換)
-            Assert.InRange(trimBytes[0], ExpectedB - 1, ExpectedB + 1);  // B
-            Assert.InRange(trimBytes[1], ExpectedG - 1, ExpectedG + 1);  // G
-            Assert.InRange(trimBytes[2], ExpectedR - 1, ExpectedR + 1);  // R
-            Assert.Equal(ExpectedA, trimBytes[3]);  // A should be exact
-        }
-        finally
-        {
-            trimmed.UnlockBits(trimData);
-        }
+        Assert.Equal(Color.FromArgb(128, 200, 100, 50).ToArgb(), trimmed.GetPixel(0, 0).ToArgb());
     }
 
     [Fact]

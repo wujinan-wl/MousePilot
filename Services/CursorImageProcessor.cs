@@ -33,8 +33,25 @@ public static class CursorImageProcessor
             return new Bitmap(1, 1, PixelFormat.Format32bppArgb);
         }
 
-        return normalized.Clone(
-            Rectangle.FromLTRB(minX, minY, maxX + 1, maxY + 1), PixelFormat.Format32bppArgb);
+        // 手動位元組裁切：Bitmap.Clone 內部經 premultiply 往返，半透明像素會 ±1 失真（review 修正）
+        var cropped = new Bitmap(maxX - minX + 1, maxY - minY + 1, PixelFormat.Format32bppArgb);
+        var cropData = cropped.LockBits(
+            new Rectangle(0, 0, cropped.Width, cropped.Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+        try
+        {
+            for (var y = 0; y < cropped.Height; y++)
+            {
+                Marshal.Copy(
+                    bytes, ((minY + y) * stride) + (minX * 4),
+                    cropData.Scan0 + (y * cropData.Stride), cropped.Width * 4);
+            }
+        }
+        finally
+        {
+            cropped.UnlockBits(cropData);
+        }
+
+        return cropped;
     }
 
     /// <summary>把與參考色 Chebyshev 距離 ≤ tolerance 的像素設為透明（規格補六 JPG 簡易去背）。</summary>
