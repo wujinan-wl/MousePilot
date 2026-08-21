@@ -54,6 +54,11 @@ public sealed class IdleDetectionService : IDisposable
     public void Suppress(TimeSpan duration)
         => _machine.Suppress(_tickProvider(), (uint)duration.TotalMilliseconds);
 
+    /// <summary>實際移動開始/結束（Phase 3；轉呼叫狀態機）。</summary>
+    public void BeginMove() => _machine.BeginMove();
+
+    public void EndMove() => _machine.EndMove();
+
     public void PollNow()
     {
         // 就地夾制：TextBox 綁定會把未夾制的值直接寫進 Settings（AppSettings 無 INPC），
