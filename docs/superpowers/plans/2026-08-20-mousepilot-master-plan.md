@@ -93,6 +93,7 @@
 - **目標：** StartupService 讀寫 `HKCU\...\Run`，UI checkbox 同步實際 Registry 狀態；「啟動後最小化到系統匣」「啟動後自動開始監控」生效。
 - **測試項目：** 規格 §34 案例 23、24；Registry 寫入失敗不 crash（顯示錯誤）。
 - **風險：** Portable EXE 被移動位置後 Run value 路徑失效——寫入時以目前 EXE 路徑更新。
+- **完成註記（final review 補強）：** (a) 已處理工作管理員「停用」語意（StartupApproved key）——IsEnabled 偵測停用旗標、Enable/Disable 清除旗標，「Registry 為真實來源」決策完整成立；(b) 測試層已加 RealRunKeyCanaryFixture（快照/驗證真 Run key），未來測試若遺漏注入 StartupService 會 fail loudly——原擬移交 Phase 11 的「測試層 guard」已就地解決。
 
 ## Phase 6：Global Hotkey
 
