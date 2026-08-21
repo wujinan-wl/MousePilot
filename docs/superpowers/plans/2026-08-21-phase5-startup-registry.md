@@ -21,6 +21,7 @@
 - Registry 例外（SecurityException/UnauthorizedAccessException/IOException）一律吞入回傳 false，不得讓程式退出（規格 §21）；VM 層失敗 → Notice + checkbox 還原。
 - EXE 路徑來源：`Environment.ProcessPath`；為 null/空時 Enable 回傳 false（保守）。
 - 測試不得寫入真實 Run key——一律用 `Software\MousePilotTests\<guid>\Run` 臨時 key，測試結束 `DeleteSubKeyTree` 清理。
+- **（review 修正補充）**測試檔內**每一個** `new MainViewModel(` 建構點都必須明確注入 startupService（無 registry 行為的 `NoOpStartupService` 或測試 key 的實例）——VM 第四參數預設會建立指向真實 Run key 的 StartupService，且建構子同步在非 pristine 機器上會以 testhost 路徑改寫真實開機項。後續 Phase 新增 VM 測試時同樣適用。
 - TDD：先測試後實作；目前基準 103 綠。
 - Commit 一律 `git commit -F <暫存檔>`（暫存檔放 `$env:TEMP`，禁 here-string），繁中+前綴+`Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`，commit 後 `git log -1 --format=%B` 驗證。
 
