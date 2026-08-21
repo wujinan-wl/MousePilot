@@ -144,4 +144,62 @@ public class IdleStateMachineTests
         var r = m.Tick(120_000, 0, Threshold, Interval);
         Assert.True(r.MoveRequested); // OS 閒置基準未變，達門檻即觸發
     }
+
+    [Fact]
+    public void BeginMove後狀態為自動移動中且不再觸發()
+    {
+        var m = Started();
+        m.Tick(120_000, 0, Threshold, Interval);       // 觸發、進入週期
+        m.BeginMove();
+        Assert.Equal(MonitorStatus.AutoMoving, m.State);
+        var r = m.Tick(150_100, 0, Threshold, Interval); // 已超過間隔，但移動中不得再觸發
+        Assert.Equal(MonitorStatus.AutoMoving, r.State);
+        Assert.False(r.MoveRequested);
+    }
+
+    [Fact]
+    public void EndMove後回到等待啟動()
+    {
+        var m = Started();
+        m.Tick(120_000, 0, Threshold, Interval);
+        m.BeginMove();
+        m.EndMove();
+        Assert.Equal(MonitorStatus.WaitingToStart, m.State);
+        var r = m.Tick(150_000, 0, Threshold, Interval); // 間隔到 → 恢復觸發
+        Assert.True(r.MoveRequested);
+    }
+
+    [Fact]
+    public void 移動中偵測到真實輸入立即取消移動旗標與週期()
+    {
+        var m = Started();
+        m.Tick(120_000, 0, Threshold, Interval);
+        m.BeginMove();
+        var r = m.Tick(121_000, 120_800, Threshold, Interval); // 真實使用者輸入
+        Assert.Equal(MonitorStatus.UserActive, r.State);
+        m.EndMove();                                            // caller finally 呼叫
+        Assert.Equal(MonitorStatus.UserActive, m.State);        // 不得誤回等待啟動
+    }
+
+    [Fact]
+    public void 未在自動週期時BeginMove無效()
+    {
+        var m = Started();
+        m.Tick(10_000, 0, Threshold, Interval);        // Monitoring，未觸發
+        m.BeginMove();
+        Assert.Equal(MonitorStatus.Monitoring, m.State);
+    }
+
+    [Fact]
+    public void Pause清除移動中旗標()
+    {
+        var m = Started();
+        m.Tick(120_000, 0, Threshold, Interval);
+        m.BeginMove();
+        m.Pause();
+        Assert.Equal(MonitorStatus.Paused, m.State);
+        m.Start(120_000, 120_000);
+        var r = m.Tick(120_500, 120_000, Threshold, Interval);
+        Assert.Equal(MonitorStatus.UserActive, r.State); // 不殘留 AutoMoving
+    }
 }

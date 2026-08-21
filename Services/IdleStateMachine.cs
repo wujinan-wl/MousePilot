@@ -26,6 +26,7 @@ public sealed class IdleStateMachine
     private bool _suppressActive;
     private bool _autoCycleActive;
     private uint _lastMoveTick;
+    private bool _moveInProgress;
 
     public MonitorStatus State { get; private set; } = MonitorStatus.Paused;
 
@@ -42,6 +43,7 @@ public sealed class IdleStateMachine
         _running = false;
         _autoCycleActive = false;
         _suppressActive = false;
+        _moveInProgress = false;
         State = MonitorStatus.Paused;
     }
 
@@ -51,6 +53,26 @@ public sealed class IdleStateMachine
         _suppressActive = true;
         _suppressStartTick = nowTick;
         _suppressUntilTick = unchecked(nowTick + durationMs);
+    }
+
+    /// <summary>實際移動動作開始（Phase 3）。僅在自動週期內生效；移動期間 State=AutoMoving 且 Tick 不發 MoveRequested。</summary>
+    public void BeginMove()
+    {
+        if (_running && _autoCycleActive)
+        {
+            _moveInProgress = true;
+            State = MonitorStatus.AutoMoving;
+        }
+    }
+
+    /// <summary>移動動作結束（caller 必須在 finally 呼叫）。仍在自動週期才回到等待啟動。</summary>
+    public void EndMove()
+    {
+        _moveInProgress = false;
+        if (_running && _autoCycleActive)
+        {
+            State = MonitorStatus.WaitingToStart;
+        }
     }
 
     public IdleTickResult Tick(uint nowTick, uint lastInputTick, int idleStartSeconds, int intervalSeconds)
@@ -76,6 +98,7 @@ public sealed class IdleStateMachine
                 // 真實使用者輸入：取消自動週期、重新計時（規格 §6/§24 最高優先）
                 _lastRealInputTick = lastInputTick;
                 _autoCycleActive = false;
+                _moveInProgress = false;
                 _suppressActive = false; // 真實輸入採納後，舊抑制窗作廢
             }
             // 抑制窗內：不採納，閒置基準維持 _lastRealInputTick
@@ -99,6 +122,12 @@ public sealed class IdleStateMachine
 
             State = idleMs < UserActiveWindowMs ? MonitorStatus.UserActive : MonitorStatus.Monitoring;
             return new IdleTickResult(State, idleSeconds, (thresholdMs - idleMs) / 1000.0, null, false);
+        }
+
+        if (_moveInProgress)
+        {
+            State = MonitorStatus.AutoMoving;
+            return new IdleTickResult(State, idleSeconds, null, null, false);
         }
 
         var sinceMove = unchecked(nowTick - _lastMoveTick);
