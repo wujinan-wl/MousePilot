@@ -63,7 +63,49 @@ public sealed class MainViewModelTests : IDisposable
         var vm = CreateVm(autoStart: false, new TestClock(), recorder);
         await vm.MoveOnceCommand.ExecuteAsync(null);
         Assert.Single(recorder.Sent);
-        Assert.Equal((503, 300), recorder.Sent[0]); // Horizontal 預設 3px
+        Assert.Equal((503, 300), recorder.Sent[0]); // Random 模式 randomIndex=3 → 右 +3px
+    }
+
+    private MainViewModel CreateVmWithReturn(TestClock clock, MoveRecorder recorder)
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(SettingsPath,
+            "{\"autoStartMonitoring\": true, \"idleStartSeconds\": 5, \"returnToOriginalPosition\": true}");
+        MainViewModel? vmRef = null;
+        var cursor = (X: 500, Y: 300);
+        var vm = new MainViewModel(new SettingsService(SettingsPath),
+            s => new IdleDetectionService(s, () => clock.Now, () => clock.LastInput, () => cursor),
+            (s, idle) => new MouseMovementService(
+                s, idle,
+                cursorProvider: () => cursor,
+                boundsProvider: () => new ScreenBounds(0, 0, 1920, 1080),
+                sendMove: (x, y) => { recorder.Sent.Add((x, y)); cursor = (x, y); return true; },
+                correctPosition: (x, y) => { cursor = (x, y); return true; },
+                lastInputProvider: () => 0u,
+                delay: (_, ct) =>
+                {
+                    vmRef!.IdleService.PollNow();      // 模擬 300ms 等待期間的輪詢（此時狀態為 UserActive）
+                    ct.ThrowIfCancellationRequested(); // 修正前會在此擲出（被誤取消）
+                    return Task.CompletedTask;
+                },
+                randomIndexProvider: () => 3));
+        vmRef = vm;
+        return vm;
+    }
+
+    [Fact]
+    public async Task 監控中手動執行不因輪詢誤取消返回()
+    {
+        var recorder = new MoveRecorder();
+        var clock = new TestClock { Now = 1_000, LastInput = 1_000 }; // 剛有輸入 → UserActive
+        var vm = CreateVmWithReturn(clock, recorder);
+        recorder.Sent.Clear();                                        // 排除建構期間可能的干擾（應為空）
+
+        await vm.MoveOnceCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, recorder.Sent.Count);                         // 去程 + 返回都完成
+        Assert.Equal((503, 300), recorder.Sent[0]);
+        Assert.Equal((500, 300), recorder.Sent[1]);
     }
 
     [Fact]

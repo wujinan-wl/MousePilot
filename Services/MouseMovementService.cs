@@ -62,6 +62,11 @@ public sealed class MouseMovementService
         }
 
         var bounds = _boundsProvider();
+        if (!bounds.Contains(origin.X, origin.Y))
+        {
+            return false; // 邊界資訊異常（GetSystemMetrics 失敗/螢幕熱插拔）→ 保守放棄，避免反向+clamp 造成大幅跳動
+        }
+
         var pixels = Math.Clamp(_settings.MovementPixels, 1, 100);
         var offset = MovementPlanner.NextOffset(_settings.MovementMode, pixels, _togglePositive, _randomIndexProvider());
         _togglePositive = !_togglePositive;

@@ -14,6 +14,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly MouseMovementService _movementService;
     private CancellationTokenSource? _moveCts;
     private bool _moving;
+    private bool _movingFromAutoCycle;
 
     public AppSettings Settings { get; }
 
@@ -74,9 +75,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void OnTicked(IdleTickResult result, (int X, int Y)? cursor)
     {
-        if (result.State == MonitorStatus.UserActive)
+        if (result.State == MonitorStatus.UserActive && _movingFromAutoCycle)
         {
-            _moveCts?.Cancel(); // 真實使用者輸入→立即取消進行中的移動（規格 §24）
+            // 真實使用者輸入→取消自動週期中的移動（規格 §24）。
+            // 手動「立即執行一次」不在此取消：使用者剛點過按鈕必為 UserActive，
+            // 誤取消會讓返回失敗；手動移動由服務內返回前雙重防線保護（final review Issue 1）。
+            _moveCts?.Cancel();
         }
 
         Status = result.State;
@@ -101,6 +105,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         _moving = true;
+        _movingFromAutoCycle = fromAutoCycle;
         var cts = new CancellationTokenSource();
         _moveCts = cts;
         try
@@ -126,6 +131,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             _moveCts = null;
             cts.Dispose();
+            _movingFromAutoCycle = false;
             _moving = false;
         }
     }
@@ -178,5 +184,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private bool CanPause() => Status != MonitorStatus.Paused;
 
-    public void Dispose() => IdleService.Dispose();
+    public void Dispose()
+    {
+        _moveCts?.Cancel(); // §30：結束時取消所有背景動作（含 300ms 返回等待）
+        IdleService.Dispose();
+    }
 }
