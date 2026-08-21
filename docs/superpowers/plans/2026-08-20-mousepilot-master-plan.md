@@ -22,7 +22,7 @@
 | 1 | 專案骨架：WPF + MVVM + Settings + Dashboard 殼 | ✅ 完成 | `2026-08-20-phase0-phase1.md` |
 | 2 | Idle Detection | ✅ 完成 | `2026-08-20-phase2-idle-detection.md` |
 | 3 | Mouse Movement | ✅ 完成 | `2026-08-20-phase3-mouse-movement.md` |
-| 4 | System Tray | ⬜ 未開始 | `2026-08-21-phase4-system-tray.md` |
+| 4 | System Tray | ✅ 完成 | `2026-08-21-phase4-system-tray.md` |
 | 5 | Startup Registry | ⬜ 未開始 | 〃 |
 | 6 | Global Hotkey | ⬜ 未開始 | 〃 |
 | 7 | Cursor Import（含內建圖案庫） | ⬜ 未開始 | 〃 |
@@ -86,7 +86,7 @@
 - **目標：** Tray icon + 右鍵選單（開啟/啟動/暫停/立即執行一次/游標三項/設定/結束）、雙擊開 Dashboard、關閉視窗縮小至 Tray（可設定）、安全結束流程（規格 §30 順序）。
 - **不在本階段範圍：** 游標三個選單項先停用（Phase 9 啟用）。
 - **測試項目：** 規格 §34 案例 25；Explorer 重啟後 Tray icon 重建（TaskbarCreated 訊息）。
-- **風險：** WPF 無內建 Tray——用 Win32 Shell_NotifyIcon PInvoke 或輕量套件，Phase 4 計畫時決定（傾向 PInvoke 以減少相依）。
+- **風險（已決策）：** 採 WinForms NotifyIcon——UseWindowsForms 屬 Desktop Runtime 內建非新 NuGet、自帶 TaskbarCreated（Explorer 重啟）重建；以 csproj `<Using Remove>` 根除與 WPF 的全域 using 型別歧義。
 
 ## Phase 5：Startup Registry
 
