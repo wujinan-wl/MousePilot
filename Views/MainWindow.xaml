@@ -144,8 +144,10 @@
                     <TextBlock Text="系統設定" Style="{StaticResource CardTitle}"/>
                     <CheckBox Content="Windows 開機時自動啟動（Phase 5 生效）"
                               IsChecked="{Binding Settings.RunAtStartup}" Margin="0,0,0,6"/>
-                    <CheckBox Content="啟動後最小化至系統匣（Phase 4 生效）"
+                    <CheckBox Content="啟動後最小化至系統匣"
                               IsChecked="{Binding Settings.StartMinimized}" Margin="0,0,0,6"/>
+                    <CheckBox Content="關閉視窗時最小化至系統匣"
+                              IsChecked="{Binding Settings.MinimizeToTrayOnClose}" Margin="0,0,0,6"/>
                     <CheckBox Content="啟動程式後自動開始監控"
                               IsChecked="{Binding Settings.AutoStartMonitoring}"/>
                 </StackPanel>
