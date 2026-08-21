@@ -761,7 +761,7 @@ public static class CurFileFormat
 - [ ] **Step 4: 執行測試，確認通過**
 
 Run: `dotnet test tests/MousePilot.Tests`
-Expected: 全綠（160 + 7 = 167）。
+Expected: 全綠（160 + 7 = 167；review 修正後含深巢狀迴歸測試為 168）。
 
 - [ ] **Step 5: Commit**
 
@@ -1216,7 +1216,7 @@ public static class CursorGallery
 - [ ] **Step 4: 執行測試，確認通過**
 
 Run: `dotnet test tests/MousePilot.Tests`
-Expected: 全綠（167 + 8 = 175；理論 2 案例）。
+Expected: 全綠（168 + 8 = 176；理論 2 案例）。
 
 - [ ] **Step 5: Commit**
 
@@ -1552,7 +1552,7 @@ public class CursorImportService
 - [ ] **Step 4: 執行測試，確認通過**
 
 Run: `dotnet test tests/MousePilot.Tests`
-Expected: 全綠（175 + 8 + 1 = 184）。
+Expected: 全綠（176 + 8 + 1 = 185）。
 
 - [ ] **Step 5: Commit**
 
@@ -1801,7 +1801,7 @@ Expected: 編譯失敗（VM 無第六、七參數/屬性/命令）。
 
 - [ ] **Step 4: 執行測試，確認通過**
 
-Run: `dotnet test tests/MousePilot.Tests`（184 + 4 = 188 全綠）、`dotnet build -c Release`（0 error 0 warning）。
+Run: `dotnet test tests/MousePilot.Tests`（185 + 4 = 189 全綠）、`dotnet build -c Release`（0 error 0 warning）。
 
 - [ ] **Step 5: Commit**
 
@@ -1847,7 +1847,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
 
 ## Phase 7 完成定義
 
-- [ ] build 0 error、測試全綠（預期 188）、publish 成功。
+- [ ] build 0 error、測試全綠（預期 189；final review 修正後 191）、publish 成功。
 - [ ] 單元測試涵蓋：裁切/去背（Chebyshev 邊界）/等比置中、.cur 寫讀往返（像素+hotspot）、損毀/截斷降級、ANI 首格、16 圖案結構與可繪製性、匯入落地/編號/損毀清理/Remove 目錄防護、收藏 round-trip、VM 匯入/取消/失敗/移除。
 - [ ] **使用者實機手動驗證（規格 §34 案例 13~17）：**
   1. 匯入 PNG（含透明）→ 顯示檔名與尺寸、檔案出現在 `%AppData%\MousePilot\Cursors\`（案例 13）。

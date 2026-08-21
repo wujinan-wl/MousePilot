@@ -116,6 +116,10 @@
 - **目標：** CursorEditorWindow：圖片 + 座標格 + 點擊設 Hotspot（十字標記 + 座標顯示 + 手動輸入）；Preview Panel（白/深色背景、按鈕、Checkbox、Hyperlink、文字區域、原始/實際尺寸與 Hotspot 顯示）；預設圖案 Grid 選擇介面。預覽絕不動全域 Cursor。
 - **測試項目：** 規格 §34 案例 18、19。
 - **風險：** 圖片顯示縮放與 hotspot 像素座標的換算（DPI、Stretch）要一致。
+- **移交輸入（Phase 7 final review，計畫撰寫時必須納入）：**
+  1. `RemoveCursor` 目前忽略 `Remove` 回傳值（刪檔失敗仍清設定 → 孤兒檔）——Phase 8 開始列舉 storage 目錄/收藏後孤兒會使用者可見，**必須修**（失敗時 Notice 且不清設定，或至少提示）。
+  2. 補六「左上角像素為預設去背參考色」**由 Phase 8 負責**：在任何處理前對解碼原圖 `GetPixel(0,0)` 取參考色，再依序呼叫處理管線。
+  3. 機會性補「損毀 .cur 經 Import 層」的測試（Phase 7 僅格式層覆蓋）。
 
 ## Phase 9：Global Cursor 套用/恢復
 
@@ -123,6 +127,7 @@
 - **測試項目：** 規格 §34 案例 20~22；手動測正常關閉/Tray Exit/登出。
 - **風險：** 本專案最高風險點——實作順序固定為「恢復路徑先寫先測，替換後寫」。
 - **移交事項（Phase 6 final review）：** (a) F10 佔位分支在 `MainViewModel.OnHotkeyPressed`（接縫清楚，替換為真實恢復動作）；(b) 預設 tray-only 狀態下 hotkey 回饋（Notice）不可見——考慮 tray balloon 或同等機制讓 F10/占用提示在無視窗時可見。
+- **移交事項（Phase 7 final review，硬性）：** (c) 圖片→.cur 組裝順序固定為 **RemoveBackground（JPG 需要時）→ TrimTransparent → ScaleProportional → CurFileFormat.Write**——JPG 無 alpha，先裁切是 no-op、去背產生的透明邊不會被裁掉，順序反了游標會縮水在透明邊距內；(d) 全背景 JPG 去背後退化為 1×1 透明 → 隱形游標，套用前必須防護（偵測退化並拒絕/提示）；(e) `CurFileFormat.Write` 前必須已縮放至 ≤256（Write 不防呆，>256 會 byte 截斷產生損毀檔）；(f) .ani 套用走 `LoadCursorFromFile`（Windows 原生支援，不自行解析動畫）。
 
 ## Phase 10：Single Instance
 
