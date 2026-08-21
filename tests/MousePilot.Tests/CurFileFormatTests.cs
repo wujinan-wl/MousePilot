@@ -85,6 +85,34 @@ public class CurFileFormatTests
         Assert.Null(CurFileFormat.TryReadAniFirstFrame(ms.ToArray()));
     }
 
+    [Fact]
+    public void 惡意深巢狀LIST回傳null不當機()
+    {
+        // 100 層巢狀 LIST/fram，無 icon chunk——深度上限應回 null 而非 StackOverflow
+        using var ms = new MemoryStream();
+        using var w = new BinaryWriter(ms);
+        const int depth = 100;
+        var innermost = 4;                        // 最內層只有 'fram'
+        var sizes = new int[depth];
+        sizes[depth - 1] = innermost;
+        for (var i = depth - 2; i >= 0; i--)
+        {
+            sizes[i] = 4 + 8 + sizes[i + 1];      // 'fram' + 內層 LIST chunk
+        }
+
+        w.Write("RIFF"u8);
+        w.Write(4 + 8 + sizes[0]);
+        w.Write("ACON"u8);
+        for (var i = 0; i < depth; i++)
+        {
+            w.Write("LIST"u8);
+            w.Write(sizes[i]);
+            w.Write("fram"u8);
+        }
+
+        Assert.Null(CurFileFormat.TryReadAniFirstFrame(ms.ToArray()));
+    }
+
     private static byte[] BuildAni(byte[] cur)
     {
         var pad = cur.Length % 2;
