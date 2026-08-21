@@ -77,6 +77,8 @@
                         <Button Content="啟動 MousePilot" Command="{Binding StartCommand}"
                                 Padding="16,8" Margin="0,0,8,0"/>
                         <Button Content="暫停" Command="{Binding PauseCommand}" Padding="16,8"/>
+                        <Button Content="立即執行一次" Command="{Binding MoveOnceCommand}"
+                                Padding="16,8" Margin="8,0,0,0"/>
                     </StackPanel>
                 </StackPanel>
             </Border>

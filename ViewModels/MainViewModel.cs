@@ -1,4 +1,6 @@
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MousePilot.Models;
@@ -9,6 +11,9 @@ namespace MousePilot.ViewModels;
 public partial class MainViewModel : ObservableObject, IDisposable
 {
     private readonly SettingsService _settingsService;
+    private readonly MouseMovementService _movementService;
+    private CancellationTokenSource? _moveCts;
+    private bool _moving;
 
     public AppSettings Settings { get; }
 
@@ -43,7 +48,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public MainViewModel(
         SettingsService settingsService,
-        Func<AppSettings, IdleDetectionService>? idleServiceFactory = null)
+        Func<AppSettings, IdleDetectionService>? idleServiceFactory = null,
+        Func<AppSettings, IdleDetectionService, MouseMovementService>? movementServiceFactory = null)
     {
         _settingsService = settingsService;
         var result = settingsService.Load();
@@ -56,6 +62,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         IdleService = (idleServiceFactory ?? (s => new IdleDetectionService(s)))(Settings);
+        _movementService = (movementServiceFactory ?? ((s, i) => new MouseMovementService(s, i)))(Settings, IdleService);
         IdleService.Ticked += OnTicked;
         IdleService.MoveRequested += OnMoveRequested;
 
@@ -67,6 +74,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void OnTicked(IdleTickResult result, (int X, int Y)? cursor)
     {
+        if (result.State == MonitorStatus.UserActive)
+        {
+            _moveCts?.Cancel(); // 真實使用者輸入→立即取消進行中的移動（規格 §24）
+        }
+
         Status = result.State;
         IdleSeconds = result.IdleSeconds;
         MousePosition = cursor is { } c ? $"X={c.X}, Y={c.Y}" : "—";
@@ -74,8 +86,49 @@ public partial class MainViewModel : ObservableObject, IDisposable
         NextMoveText = result.SecondsUntilNextMove is { } n ? $"{n:F0} 秒" : "—";
     }
 
-    // Phase 3 接上 MouseMovementService 執行實際移動；目前僅累計佔位事件
-    private void OnMoveRequested() => TriggerCount++;
+    // 訂閱端不得拋例外（Phase 2 移交約束 2）：整個移動流程包在 guarded 方法內
+    private async void OnMoveRequested() => await ExecuteMoveGuardedAsync(fromAutoCycle: true);
+
+    /// <summary>立即執行一次（規格 §14）：不等 Idle Timer，依目前設定執行。</summary>
+    [RelayCommand]
+    private async Task MoveOnceAsync() => await ExecuteMoveGuardedAsync(fromAutoCycle: false);
+
+    private async Task ExecuteMoveGuardedAsync(bool fromAutoCycle)
+    {
+        if (_moving)
+        {
+            return; // 防重入：自動觸發與手動執行不重疊
+        }
+
+        _moving = true;
+        var cts = new CancellationTokenSource();
+        _moveCts = cts;
+        try
+        {
+            if (fromAutoCycle)
+            {
+                TriggerCount++;
+                IdleService.BeginMove();
+            }
+
+            await _movementService.ExecuteMoveAsync(cts.Token);
+        }
+        catch (Exception ex)
+        {
+            Notice = $"滑鼠移動失敗：{ex.Message}"; // Phase 11 接上 LogService 後記錄
+        }
+        finally
+        {
+            if (fromAutoCycle)
+            {
+                IdleService.EndMove();
+            }
+
+            _moveCts = null;
+            cts.Dispose();
+            _moving = false;
+        }
+    }
 
     partial void OnStatusChanged(MonitorStatus value)
     {
@@ -117,7 +170,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private bool CanStart() => Status == MonitorStatus.Paused;
 
     [RelayCommand(CanExecute = nameof(CanPause))]
-    private void Pause() => IdleService.Pause();
+    private void Pause()
+    {
+        _moveCts?.Cancel();
+        IdleService.Pause();
+    }
 
     private bool CanPause() => Status != MonitorStatus.Paused;
 

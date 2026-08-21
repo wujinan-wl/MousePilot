@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using Xunit;
 using MousePilot.Models;
 using MousePilot.Services;
@@ -25,13 +27,65 @@ public sealed class MainViewModelTests : IDisposable
         try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
     }
 
-    private MainViewModel CreateVm(bool autoStart, TestClock clock)
+    private sealed class MoveRecorder
+    {
+        public List<(int X, int Y)> Sent { get; } = new();
+        public bool ThrowOnMove;
+    }
+
+    private MainViewModel CreateVm(bool autoStart, TestClock clock, MoveRecorder? recorder = null)
     {
         Directory.CreateDirectory(_dir);
         File.WriteAllText(SettingsPath,
-            $"{{\"autoStartMonitoring\": {(autoStart ? "true" : "false")}, \"idleStartSeconds\": 5}}");
+            $"{{\"autoStartMonitoring\": {(autoStart ? "true" : "false")}, \"idleStartSeconds\": 5, \"returnToOriginalPosition\": false}}");
         return new MainViewModel(new SettingsService(SettingsPath),
-            s => new IdleDetectionService(s, () => clock.Now, () => clock.LastInput, () => (7, 8)));
+            s => new IdleDetectionService(s, () => clock.Now, () => clock.LastInput, () => (7, 8)),
+            (s, idle) => new MouseMovementService(
+                s, idle,
+                cursorProvider: () => (500, 300),
+                boundsProvider: () => new ScreenBounds(0, 0, 1920, 1080),
+                sendMove: (x, y) =>
+                {
+                    if (recorder?.ThrowOnMove == true) { throw new InvalidOperationException("boom"); }
+                    recorder?.Sent.Add((x, y));
+                    return true;
+                },
+                correctPosition: (_, _) => true,
+                lastInputProvider: () => 0u,
+                delay: (_, _) => Task.CompletedTask,
+                randomIndexProvider: () => 3));
+    }
+
+    [Fact]
+    public async Task 立即執行一次會送出移動()
+    {
+        var recorder = new MoveRecorder();
+        var vm = CreateVm(autoStart: false, new TestClock(), recorder);
+        await vm.MoveOnceCommand.ExecuteAsync(null);
+        Assert.Single(recorder.Sent);
+        Assert.Equal((503, 300), recorder.Sent[0]); // Horizontal 預設 3px
+    }
+
+    [Fact]
+    public void 自動觸發時執行移動並累計次數()
+    {
+        var recorder = new MoveRecorder();
+        var clock = new TestClock();
+        var vm = CreateVm(autoStart: true, clock, recorder);
+        clock.Now = 5_000;
+        vm.IdleService.PollNow();          // 觸發 → MoveRequested → 移動（delay 為同步完成）
+        Assert.Equal(1, vm.TriggerCount);
+        Assert.Single(recorder.Sent);
+    }
+
+    [Fact]
+    public async Task 移動例外不外拋僅顯示提示()
+    {
+        var recorder = new MoveRecorder { ThrowOnMove = true };
+        var vm = CreateVm(autoStart: false, new TestClock(), recorder);
+        var ex = await Record.ExceptionAsync(() => vm.MoveOnceCommand.ExecuteAsync(null));
+        Assert.Null(ex);
+        Assert.Contains("移動失敗", vm.Notice);
     }
 
     [Fact]
