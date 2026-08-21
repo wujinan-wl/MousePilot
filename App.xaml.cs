@@ -24,8 +24,8 @@ public partial class App : Application
 
         _tray = new TrayIconService();
         _tray.OpenRequested += ShowDashboard;
-        _tray.StartRequested += () => vm.StartCommand.Execute(null);
-        _tray.PauseRequested += () => vm.PauseCommand.Execute(null);
+        _tray.StartRequested += () => { if (vm.StartCommand.CanExecute(null)) { vm.StartCommand.Execute(null); } };
+        _tray.PauseRequested += () => { if (vm.PauseCommand.CanExecute(null)) { vm.PauseCommand.Execute(null); } };
         _tray.MoveOnceRequested += () => vm.MoveOnceCommand.Execute(null);
         _tray.ExitRequested += ExitApplication;
         vm.PropertyChanged += OnViewModelPropertyChanged;

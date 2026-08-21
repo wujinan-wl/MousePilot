@@ -10,9 +10,13 @@ namespace MousePilot.ViewModels;
 
 public partial class MainViewModel : ObservableObject, IDisposable
 {
+    public const int ToggleHotkeyId = 1;
+    public const int RestoreCursorHotkeyId = 2;
+
     private readonly SettingsService _settingsService;
     private readonly MouseMovementService _movementService;
     private readonly StartupService _startupService;
+    private readonly HotkeyService _hotkeyService;
     private CancellationTokenSource? _moveCts;
     private bool _moving;
     private bool _movingFromAutoCycle;
@@ -52,7 +56,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         SettingsService settingsService,
         Func<AppSettings, IdleDetectionService>? idleServiceFactory = null,
         Func<AppSettings, IdleDetectionService, MouseMovementService>? movementServiceFactory = null,
-        StartupService? startupService = null)
+        StartupService? startupService = null,
+        HotkeyService? hotkeyService = null)
     {
         _settingsService = settingsService;
         var result = settingsService.Load();
@@ -80,6 +85,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 }
             }
         }
+
+        _hotkeyService = hotkeyService ?? new HotkeyService();
+        _hotkeyService.HotkeyPressed += OnHotkeyPressed;
+        RegisterHotkeyFromSettings(ToggleHotkeyId, Settings.ToggleHotkey, "啟動/暫停");
+        RegisterHotkeyFromSettings(RestoreCursorHotkeyId, Settings.RestoreCursorHotkey, "恢復游標");
 
         IdleService.Ticked += OnTicked;
         IdleService.MoveRequested += OnMoveRequested;
@@ -195,6 +205,105 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>啟動/暫停快捷鍵（規格 §17）。</summary>
+    public string ToggleHotkeyText
+    {
+        get => Settings.ToggleHotkey;
+        set => TrySetHotkey(value, isToggle: true);
+    }
+
+    /// <summary>恢復 Windows 游標快捷鍵（動作於 Phase 9 接上）。</summary>
+    public string RestoreCursorHotkeyText
+    {
+        get => Settings.RestoreCursorHotkey;
+        set => TrySetHotkey(value, isToggle: false);
+    }
+
+    private void TrySetHotkey(string text, bool isToggle)
+    {
+        var current = isToggle ? Settings.ToggleHotkey : Settings.RestoreCursorHotkey;
+        var propertyName = isToggle ? nameof(ToggleHotkeyText) : nameof(RestoreCursorHotkeyText);
+        if (text == current)
+        {
+            return;
+        }
+
+        var error = HotkeyParser.Validate(text);
+        var other = isToggle ? Settings.RestoreCursorHotkey : Settings.ToggleHotkey;
+        if (error is null && text == other)
+        {
+            error = "快捷鍵不可與另一項重複。";
+        }
+
+        if (error is null)
+        {
+            var id = isToggle ? ToggleHotkeyId : RestoreCursorHotkeyId;
+            var combo = HotkeyParser.Parse(text)!.Value;
+            if (_hotkeyService.Register(id, combo))
+            {
+                if (isToggle)
+                {
+                    Settings.ToggleHotkey = text;
+                }
+                else
+                {
+                    Settings.RestoreCursorHotkey = text;
+                }
+            }
+            else
+            {
+                error = $"快捷鍵 {text} 已被其他程式占用。";
+                if (HotkeyParser.Parse(current) is { } old)
+                {
+                    _hotkeyService.Register(id, old); // 還原舊組合的註冊
+                }
+            }
+        }
+
+        if (error is not null)
+        {
+            Notice = error;
+        }
+
+        OnPropertyChanged(propertyName);
+    }
+
+    private void RegisterHotkeyFromSettings(int id, string text, string label)
+    {
+        if (HotkeyParser.Parse(text) is not { } combo)
+        {
+            Notice = $"快捷鍵設定「{text}」無效，{label} 快捷鍵未啟用。";
+            return;
+        }
+
+        if (!_hotkeyService.Register(id, combo))
+        {
+            Notice = $"快捷鍵 {text} 已被其他程式占用，{label} 快捷鍵未啟用。";
+        }
+    }
+
+    private void OnHotkeyPressed(int id)
+    {
+        if (id == ToggleHotkeyId)
+        {
+            if (Status == MonitorStatus.Paused)
+            {
+                if (StartCommand.CanExecute(null))
+                {
+                    StartCommand.Execute(null);
+                }
+            }
+            else if (PauseCommand.CanExecute(null))
+            {
+                PauseCommand.Execute(null);
+            }
+        }
+        else if (id == RestoreCursorHotkeyId)
+        {
+            Notice = "恢復 Windows 游標功能將於自訂游標功能完成後啟用。";
+        }
+    }
+
     public void SaveSettings()
     {
         try
@@ -230,7 +339,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
-        _moveCts?.Cancel(); // §30：結束時取消所有背景動作（含 300ms 返回等待）
+        _moveCts?.Cancel();        // §30：結束時取消所有背景動作（含 300ms 返回等待）
+        _hotkeyService.Dispose();  // §30 步驟 4：Unregister Global Hotkey
         IdleService.Dispose();
     }
 }

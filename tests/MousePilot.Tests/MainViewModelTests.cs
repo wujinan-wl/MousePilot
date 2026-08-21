@@ -34,6 +34,30 @@ public sealed class MainViewModelTests : IDisposable
         public bool ThrowOnMove;
     }
 
+    private sealed class HotkeyHarness
+    {
+        public List<(int Id, uint Mod, uint Vk)> Registered { get; } = new();
+        public List<int> Unregistered { get; } = new();
+        public HashSet<(uint Mod, uint Vk)> Occupied { get; } = new();
+        public HotkeyService Service { get; }
+
+        public HotkeyHarness()
+        {
+            Service = new HotkeyService(
+                (id, mod, vk) =>
+                {
+                    if (Occupied.Contains((mod, vk)))
+                    {
+                        return false;
+                    }
+
+                    Registered.Add((id, mod, vk));
+                    return true;
+                },
+                id => { Unregistered.Add(id); return true; });
+        }
+    }
+
     private MainViewModel CreateVm(bool autoStart, TestClock clock, MoveRecorder? recorder = null)
     {
         Directory.CreateDirectory(_dir);
@@ -55,7 +79,8 @@ public sealed class MainViewModelTests : IDisposable
                 lastInputProvider: () => 0u,
                 delay: (_, _) => Task.CompletedTask,
                 randomIndexProvider: () => 3),
-            new NoOpStartupService());
+            new NoOpStartupService(),
+            new HotkeyHarness().Service);
     }
 
     [Fact]
@@ -91,7 +116,8 @@ public sealed class MainViewModelTests : IDisposable
                     return Task.CompletedTask;
                 },
                 randomIndexProvider: () => 3),
-            new NoOpStartupService());
+            new NoOpStartupService(),
+            new HotkeyHarness().Service);
         vmRef = vm;
         return vm;
     }
@@ -192,7 +218,8 @@ public sealed class MainViewModelTests : IDisposable
         var vm = new MainViewModel(new SettingsService(SettingsPath),
             s => new IdleDetectionService(s, () => clock.Now, () => clock.LastInput, () => null),
             null,
-            new NoOpStartupService());
+            new NoOpStartupService(),
+            new HotkeyHarness().Service);
         vm.IdleService.PollNow();
         Assert.Equal("—", vm.MousePosition);
     }
@@ -232,7 +259,8 @@ public sealed class MainViewModelTests : IDisposable
         var vm = new MainViewModel(new SettingsService(SettingsPath),
             s => new IdleDetectionService(s, () => 0u, () => 0u, () => (0, 0)),
             null,
-            new NoOpStartupService());
+            new NoOpStartupService(),
+            new HotkeyHarness().Service);
 
         Assert.Contains("預設值", vm.Notice);
         Assert.Equal(120, vm.Settings.IdleStartSeconds);
@@ -259,7 +287,8 @@ public sealed class MainViewModelTests : IDisposable
         var vm = new MainViewModel(new SettingsService(Path.Combine(blockedDir, "settings.json")),
             s => new IdleDetectionService(s, () => 0u, () => 0u, () => (0, 0)),
             null,
-            new NoOpStartupService());
+            new NoOpStartupService(),
+            new HotkeyHarness().Service);
 
         var ex = Record.Exception(() => vm.SaveSettings());
 
@@ -395,7 +424,7 @@ public sealed class MainViewModelTests : IDisposable
         }
     }
 
-    private MainViewModel CreateVmWithStartup(StartupService startup)
+    private MainViewModel CreateVmWithStartup(StartupService startup, HotkeyService? hotkey = null)
     {
         Directory.CreateDirectory(_dir);
         File.WriteAllText(SettingsPath, "{\"autoStartMonitoring\": false, \"idleStartSeconds\": 5}");
@@ -411,6 +440,100 @@ public sealed class MainViewModelTests : IDisposable
                 lastInputProvider: () => 0u,
                 delay: (_, _) => Task.CompletedTask,
                 randomIndexProvider: () => 0),
-            startup);
+            startup,
+            hotkey ?? new HotkeyHarness().Service);
+    }
+
+    [Fact]
+    public void 啟動時依設定註冊兩組快捷鍵()
+    {
+        var hotkeys = new HotkeyHarness();
+        var vm = CreateVmWithStartup(new NoOpStartupService(), hotkeys.Service);
+        Assert.Contains((MainViewModel.ToggleHotkeyId, HotkeyParser.ModControl | HotkeyParser.ModAlt, 0x78u), hotkeys.Registered);
+        Assert.Contains((MainViewModel.RestoreCursorHotkeyId, HotkeyParser.ModControl | HotkeyParser.ModAlt, 0x79u), hotkeys.Registered);
+        Assert.Equal("", vm.Notice);
+    }
+
+    [Fact]
+    public void 啟動時快捷鍵被占用顯示提示但不當機()
+    {
+        var hotkeys = new HotkeyHarness();
+        hotkeys.Occupied.Add((HotkeyParser.ModControl | HotkeyParser.ModAlt, 0x78u));
+        var vm = CreateVmWithStartup(new NoOpStartupService(), hotkeys.Service);
+        Assert.Contains("占用", vm.Notice);
+    }
+
+    [Fact]
+    public void 修改快捷鍵成功後更新設定並重新註冊()
+    {
+        var hotkeys = new HotkeyHarness();
+        var vm = CreateVmWithStartup(new NoOpStartupService(), hotkeys.Service);
+
+        vm.ToggleHotkeyText = "Ctrl+Shift+M";
+
+        Assert.Equal("Ctrl+Shift+M", vm.Settings.ToggleHotkey);
+        Assert.Contains((MainViewModel.ToggleHotkeyId, HotkeyParser.ModControl | HotkeyParser.ModShift, 0x4Du), hotkeys.Registered);
+    }
+
+    [Fact]
+    public void 無效快捷鍵顯示提示且還原()
+    {
+        var vm = CreateVmWithStartup(new NoOpStartupService(), new HotkeyHarness().Service);
+
+        vm.ToggleHotkeyText = "F9";
+
+        Assert.Equal("Ctrl+Alt+F9", vm.Settings.ToggleHotkey);
+        Assert.Equal("Ctrl+Alt+F9", vm.ToggleHotkeyText);
+        Assert.Contains("修飾鍵", vm.Notice);
+    }
+
+    [Fact]
+    public void 與另一組重複顯示提示且還原()
+    {
+        var vm = CreateVmWithStartup(new NoOpStartupService(), new HotkeyHarness().Service);
+
+        vm.ToggleHotkeyText = "Ctrl+Alt+F10"; // 與恢復游標重複
+
+        Assert.Equal("Ctrl+Alt+F9", vm.Settings.ToggleHotkey);
+        Assert.Contains("重複", vm.Notice);
+    }
+
+    [Fact]
+    public void 被占用時顯示提示且舊組合重新註冊()
+    {
+        var hotkeys = new HotkeyHarness();
+        var vm = CreateVmWithStartup(new NoOpStartupService(), hotkeys.Service);
+        hotkeys.Occupied.Add((HotkeyParser.ModControl | HotkeyParser.ModShift, 0x4Du));
+
+        vm.ToggleHotkeyText = "Ctrl+Shift+M";
+
+        Assert.Equal("Ctrl+Alt+F9", vm.Settings.ToggleHotkey);
+        Assert.Contains("占用", vm.Notice);
+        // 舊組合在失敗後重新註冊（最後一筆應為 Ctrl+Alt+F9）
+        Assert.Equal((MainViewModel.ToggleHotkeyId, HotkeyParser.ModControl | HotkeyParser.ModAlt, 0x78u), hotkeys.Registered[^1]);
+    }
+
+    [Fact]
+    public void F9快捷鍵切換啟動與暫停()
+    {
+        var hotkeys = new HotkeyHarness();
+        var vm = CreateVmWithStartup(new NoOpStartupService(), hotkeys.Service); // autoStart=false → Paused
+
+        hotkeys.Service.SimulatePress(MainViewModel.ToggleHotkeyId);
+        Assert.NotEqual(MonitorStatus.Paused, vm.Status);
+
+        hotkeys.Service.SimulatePress(MainViewModel.ToggleHotkeyId);
+        Assert.Equal(MonitorStatus.Paused, vm.Status);
+    }
+
+    [Fact]
+    public void F10快捷鍵顯示佔位提示()
+    {
+        var hotkeys = new HotkeyHarness();
+        var vm = CreateVmWithStartup(new NoOpStartupService(), hotkeys.Service);
+
+        hotkeys.Service.SimulatePress(MainViewModel.RestoreCursorHotkeyId);
+
+        Assert.Contains("自訂游標", vm.Notice);
     }
 }
