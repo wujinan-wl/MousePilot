@@ -36,6 +36,13 @@ public class AppSettings
     /// <summary>把所有數值夾制到規格允許範圍（載入與保存前呼叫）。</summary>
     public void Clamp()
     {
+        // 合法 JSON 的 null 欄位會反序列化為 null（不觸發損毀備份路徑）——正規化防啟動 NRE（review 修正）
+        CursorFile ??= "";
+        CursorPreset ??= "";
+        ToggleHotkey ??= "Ctrl+Alt+F9";
+        RestoreCursorHotkey ??= "Ctrl+Alt+F10";
+        FavoriteCursors ??= new();
+
         IdleStartSeconds = Math.Clamp(IdleStartSeconds, 5, 86400);
         MovementIntervalSeconds = Math.Clamp(MovementIntervalSeconds, 1, 86400);
         MovementPixels = Math.Clamp(MovementPixels, 1, 100);

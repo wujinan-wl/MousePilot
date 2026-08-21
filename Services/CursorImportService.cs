@@ -69,7 +69,7 @@ public class CursorImportService
             File.Delete(full);
             return true;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
         {
             return false;
         }
@@ -124,7 +124,7 @@ public class CursorImportService
                     using var bmp = new Bitmap(path);
                     return (bmp.Width, bmp.Height, null);
                 }
-                catch (ArgumentException)
+                catch (Exception ex) when (ex is ArgumentException or OutOfMemoryException or System.Runtime.InteropServices.ExternalException or InvalidOperationException)
                 {
                     return (null, null, "圖片損毀或格式不支援。");
                 }

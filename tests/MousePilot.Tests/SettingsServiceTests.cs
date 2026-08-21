@@ -96,6 +96,20 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public void null字串欄位載入時正規化()
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(SettingsPath,
+            "{\"cursorFile\": null, \"toggleHotkey\": null, \"favoriteCursors\": null}");
+
+        var loaded = new SettingsService(SettingsPath).Load().Settings;
+
+        Assert.Equal("", loaded.CursorFile);
+        Assert.Equal("Ctrl+Alt+F9", loaded.ToggleHotkey);
+        Assert.NotNull(loaded.FavoriteCursors);
+    }
+
+    [Fact]
     public void 收藏清單可保存與載回()
     {
         var service = new SettingsService(SettingsPath);

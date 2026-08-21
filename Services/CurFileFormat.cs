@@ -95,7 +95,10 @@ public static class CurFileFormat
             if (data[offset] == 0x89 && data[offset + 1] == 0x50) // PNG 條目
             {
                 using var pngStream = new MemoryStream(data, offset, size);
-                image = new Bitmap(pngStream);
+                using var decoded = new Bitmap(pngStream);
+                // 完整解碼並脫離 stream：GDI+ 要求 stream 存活於 Image 生命週期，
+                // 直接回傳會在 stream 釋放後的延遲解碼觸發 GDI+ 錯誤（review 修正）
+                image = Detach(decoded);
             }
             else
             {
@@ -110,8 +113,9 @@ public static class CurFileFormat
 
             return (new CurImage(image.Width, image.Height, hotspotX, hotspotY), image);
         }
-        catch (Exception ex) when (ex is ArgumentException or IOException or IndexOutOfRangeException)
+        catch (Exception ex) when (ex is ArgumentException or IOException or IndexOutOfRangeException or OutOfMemoryException or System.Runtime.InteropServices.ExternalException or InvalidOperationException)
         {
+            // GDI+ 對損毀影像會拋 OOM/ExternalException（假 OOM quirk），一併視為格式錯誤
             return null;
         }
     }
@@ -130,8 +134,9 @@ public static class CurFileFormat
 
             return FindIconChunk(data, 12, data.Length, depth: 0);
         }
-        catch (Exception ex) when (ex is ArgumentException or IOException or IndexOutOfRangeException)
+        catch (Exception ex) when (ex is ArgumentException or IOException or IndexOutOfRangeException or OutOfMemoryException or System.Runtime.InteropServices.ExternalException or InvalidOperationException)
         {
+            // GDI+ 對損毀影像會拋 OOM/ExternalException（假 OOM quirk），一併視為格式錯誤
             return null;
         }
     }
@@ -171,6 +176,24 @@ public static class CurFileFormat
         }
 
         return null;
+    }
+
+    /// <summary>把 Bitmap 完整複製為獨立的 32bppArgb（同格式位元組拷貝無損；異格式經 SourceCopy 轉換）。</summary>
+    private static Bitmap Detach(Bitmap source)
+    {
+        var result = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
+        if (source.PixelFormat == PixelFormat.Format32bppArgb)
+        {
+            WriteArgb(result, ReadArgb(source));
+        }
+        else
+        {
+            using var g = Graphics.FromImage(result);
+            g.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
+            g.DrawImageUnscaled(source, 0, 0);
+        }
+
+        return result;
     }
 
     private static Bitmap? TryDecodeDib32(byte[] data, int offset, int size, int width, int height)

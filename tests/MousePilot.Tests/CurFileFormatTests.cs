@@ -113,6 +113,46 @@ public class CurFileFormatTests
         Assert.Null(CurFileFormat.TryReadAniFirstFrame(ms.ToArray()));
     }
 
+    [Fact]
+    public void PNG條目的cur可讀取且影像獨立於來源()
+    {
+        using var bmp = MakeTestImage();
+        byte[] png;
+        using (var ms = new MemoryStream())
+        {
+            bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+            png = ms.ToArray();
+        }
+
+        var cur = BuildPngCur(png, 8, 8, hotspotX: 3, hotspotY: 4);
+        var read = CurFileFormat.TryReadFirstImage(cur);
+
+        Assert.NotNull(read);
+        Assert.Equal(new CurImage(8, 8, 3, 4), read!.Value.Info);
+        using var image = read.Value.Image;
+        Assert.Equal(System.Drawing.Imaging.PixelFormat.Format32bppArgb, image.PixelFormat);
+        Assert.Equal(Color.FromArgb(255, 255, 0, 0).ToArgb(), image.GetPixel(0, 0).ToArgb());
+    }
+
+    private static byte[] BuildPngCur(byte[] png, int width, int height, int hotspotX, int hotspotY)
+    {
+        using var ms = new MemoryStream();
+        using var w = new BinaryWriter(ms);
+        w.Write((ushort)0);
+        w.Write((ushort)2);
+        w.Write((ushort)1);
+        w.Write((byte)width);
+        w.Write((byte)height);
+        w.Write((byte)0);
+        w.Write((byte)0);
+        w.Write((ushort)hotspotX);
+        w.Write((ushort)hotspotY);
+        w.Write((uint)png.Length);
+        w.Write((uint)22);
+        w.Write(png);
+        return ms.ToArray();
+    }
+
     private static byte[] BuildAni(byte[] cur)
     {
         var pad = cur.Length % 2;
