@@ -27,8 +27,13 @@ public partial class MainWindow : Window
 
     private void CaptureHotkey(KeyEventArgs e, bool isToggle)
     {
-        e.Handled = true;
         var key = e.Key == Key.System ? e.SystemKey : e.Key; // Alt 組合鍵的實際主鍵在 SystemKey
+        if (key == Key.Tab)
+        {
+            return; // 放行 Tab/Shift+Tab 導航，避免鍵盤焦點陷阱（review 修正）
+        }
+
+        e.Handled = true;
         if (HotkeyCapture.FromKeyEvent(key, Keyboard.Modifiers) is not { } gesture)
         {
             return; // 僅修飾鍵或不支援的鍵：等待完整組合
