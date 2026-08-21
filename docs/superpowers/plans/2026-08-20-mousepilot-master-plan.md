@@ -100,6 +100,7 @@
 - **測試項目：** 規格 §34 案例 26、27。
 - **風險：** Hotkey 需要 HWND 訊息迴圈——掛在隱藏訊息視窗上，避免依賴 MainWindow 存在。
 - **移交事項（Phase 2 ledger）：** 本階段開始有程式改設定值 → AppSettings 需 INPC 化（或 VM 包裝屬性），順帶解決「StartMonitoring 的 Clamp 改值後 UI 不刷新」問題。
+- **移交事項（Phase 4 final review）：** Tray 選單的 Start/Pause 以 `Execute(null)` 直呼、未檢查 CanExecute（選單開著跨狀態轉換時可能 stale）——hotkey 啟停實作時一併在兩處呼叫點加 `CanExecute` guard。
 
 ## Phase 7：Cursor Import（含內建圖案庫）
 
@@ -133,6 +134,7 @@
 - **風險：** 例外 handler 內再拋例外——handler 必須自身 try/catch 到底。
 - **移交事項（Phase 2 ledger）：** (a) `MonitorStatus` 需擴充 `Error` 值 + XAML 紅色狀態點（規格 §28）；(b) 全域 handler 必須涵蓋 Dispatcher 例外（DispatcherTimer 事件路徑目前無防護）。
 - **移交事項（Phase 3 ledger）：** (c) `MouseMovementService.ExecuteMoveAsync` 回傳 bare bool，無法區分「取消/Win32 失敗/保守放棄」——接 log 時需改 reason enum 或注入 log callback（簽章變更要規劃，不要現場發現）；(d) VM `_moving` 防重入的靜默丟棄應記 log。
+- **移交事項（Phase 4 final review）：** (e) 未處理例外 crash 會跳過 OnExit → ghost tray icon + 設定未保存；預設 tray-only 模式下例外風險升高——全域 handler 必須包含 Tray.Dispose 與 SaveSettings（連同既有的恢復游標要求）。
 
 ## Phase 12：Publish + 文件交付
 
