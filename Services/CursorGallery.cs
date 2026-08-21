@@ -312,7 +312,8 @@ public static class CursorGallery
         using var antenna = new SolidBrush(Color.FromArgb(220, 38, 38));
         g.FillEllipse(antenna, 14.4f, 0, 3.2f, 3.2f);
         using var head = new GraphicsPath();
-        head.AddPath(RoundedRect(5, 6, 22, 20, 4), false);
+        using var headRect = RoundedRect(5, 6, 22, 20, 4);
+        head.AddPath(headRect, false);
         using var gray = new SolidBrush(Color.FromArgb(203, 213, 225));
         FillAndOutline(g, gray, head);
         using var eye = new SolidBrush(Color.FromArgb(37, 99, 235));
