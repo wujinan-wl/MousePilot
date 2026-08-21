@@ -22,7 +22,7 @@
 | 1 | 專案骨架：WPF + MVVM + Settings + Dashboard 殼 | ✅ 完成 | `2026-08-20-phase0-phase1.md` |
 | 2 | Idle Detection | ✅ 完成 | `2026-08-20-phase2-idle-detection.md` |
 | 3 | Mouse Movement | ✅ 完成 | `2026-08-20-phase3-mouse-movement.md` |
-| 4 | System Tray | ⬜ 未開始 | 〃 |
+| 4 | System Tray | ⬜ 未開始 | `2026-08-21-phase4-system-tray.md` |
 | 5 | Startup Registry | ⬜ 未開始 | 〃 |
 | 6 | Global Hotkey | ⬜ 未開始 | 〃 |
 | 7 | Cursor Import（含內建圖案庫） | ⬜ 未開始 | 〃 |
