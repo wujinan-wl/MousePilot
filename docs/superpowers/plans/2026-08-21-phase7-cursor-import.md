@@ -140,6 +140,42 @@ public class CursorImageProcessorTests
     }
 
     [Fact]
+    public void 半透明像素經裁切位元組無損()
+    {
+        // 注意：SetPixel/GetPixel 對半透明像素本身有損（GDI+ premultiply 往返），
+        // 真不變量須以 LockBits 位元組進出驗證（review 修正）
+        using var src = new Bitmap(3, 3, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        var data = src.LockBits(new Rectangle(0, 0, 3, 3),
+            System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        try
+        {
+            var pixel = new byte[] { 50, 100, 200, 128 }; // BGRA @ (1,1)
+            System.Runtime.InteropServices.Marshal.Copy(pixel, 0, data.Scan0 + data.Stride + 4, 4);
+        }
+        finally
+        {
+            src.UnlockBits(data);
+        }
+
+        using var trimmed = CursorImageProcessor.TrimTransparent(src);
+
+        Assert.Equal(1, trimmed.Width);
+        Assert.Equal(1, trimmed.Height);
+        var outData = trimmed.LockBits(new Rectangle(0, 0, 1, 1),
+            System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        try
+        {
+            var outPixel = new byte[4];
+            System.Runtime.InteropServices.Marshal.Copy(outData.Scan0, outPixel, 0, 4);
+            Assert.Equal(new byte[] { 50, 100, 200, 128 }, outPixel);
+        }
+        finally
+        {
+            trimmed.UnlockBits(outData);
+        }
+    }
+
+    [Fact]
     public void 縮放結果為32bppArgb()
     {
         using var src = MakeBitmap(10, 10);
@@ -192,8 +228,25 @@ public static class CursorImageProcessor
             return new Bitmap(1, 1, PixelFormat.Format32bppArgb);
         }
 
-        return normalized.Clone(
-            Rectangle.FromLTRB(minX, minY, maxX + 1, maxY + 1), PixelFormat.Format32bppArgb);
+        // 手動位元組裁切：Bitmap.Clone 內部經 premultiply 往返，半透明像素會 ±1 失真（review 修正）
+        var cropped = new Bitmap(maxX - minX + 1, maxY - minY + 1, PixelFormat.Format32bppArgb);
+        var cropData = cropped.LockBits(
+            new Rectangle(0, 0, cropped.Width, cropped.Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+        try
+        {
+            for (var y = 0; y < cropped.Height; y++)
+            {
+                Marshal.Copy(
+                    bytes, ((minY + y) * stride) + (minX * 4),
+                    cropData.Scan0 + (y * cropData.Stride), cropped.Width * 4);
+            }
+        }
+        finally
+        {
+            cropped.UnlockBits(cropData);
+        }
+
+        return cropped;
     }
 
     /// <summary>把與參考色 Chebyshev 距離 ≤ tolerance 的像素設為透明（規格補六 JPG 簡易去背）。</summary>
@@ -238,7 +291,40 @@ public static class CursorImageProcessor
     private static Bitmap ToArgb(Bitmap source)
     {
         var clone = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
+        if (source.PixelFormat == PixelFormat.Format32bppArgb)
+        {
+            // 同格式：位元組直拷，完全繞過 GDI+ 繪製管線的 premultiply 取整（review 修正：
+            // 實測 DrawImageUnscaled 即使 SourceCopy 對半透明像素仍有 ±1 取整）
+            var srcData = source.LockBits(
+                new Rectangle(0, 0, source.Width, source.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            try
+            {
+                var dstData = clone.LockBits(
+                    new Rectangle(0, 0, clone.Width, clone.Height), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+                try
+                {
+                    var row = new byte[source.Width * 4];
+                    for (var y = 0; y < source.Height; y++)
+                    {
+                        Marshal.Copy(srcData.Scan0 + (y * srcData.Stride), row, 0, row.Length);
+                        Marshal.Copy(row, 0, dstData.Scan0 + (y * dstData.Stride), row.Length);
+                    }
+                }
+                finally
+                {
+                    clone.UnlockBits(dstData);
+                }
+            }
+            finally
+            {
+                source.UnlockBits(srcData);
+            }
+
+            return clone;
+        }
+
         using var g = Graphics.FromImage(clone);
+        g.CompositingMode = CompositingMode.SourceCopy; // 非 32bppArgb 來源：SourceCopy 繪製轉換，避免混合失真
         g.DrawImageUnscaled(source, 0, 0);
         return clone;
     }
@@ -279,7 +365,7 @@ public static class CursorImageProcessor
 - [ ] **Step 4: 執行測試，確認通過**
 
 Run: `dotnet test tests/MousePilot.Tests`
-Expected: 全綠（152 + 7 = 159）。
+Expected: 全綠（152 + 8 = 160）。
 
 - [ ] **Step 5: Commit**
 
@@ -670,7 +756,7 @@ public static class CurFileFormat
 - [ ] **Step 4: 執行測試，確認通過**
 
 Run: `dotnet test tests/MousePilot.Tests`
-Expected: 全綠（159 + 7 = 166）。
+Expected: 全綠（160 + 7 = 167）。
 
 - [ ] **Step 5: Commit**
 
@@ -1124,7 +1210,7 @@ public static class CursorGallery
 - [ ] **Step 4: 執行測試，確認通過**
 
 Run: `dotnet test tests/MousePilot.Tests`
-Expected: 全綠（166 + 8 = 174；理論 2 案例）。
+Expected: 全綠（167 + 8 = 175；理論 2 案例）。
 
 - [ ] **Step 5: Commit**
 
@@ -1460,7 +1546,7 @@ public class CursorImportService
 - [ ] **Step 4: 執行測試，確認通過**
 
 Run: `dotnet test tests/MousePilot.Tests`
-Expected: 全綠（174 + 8 + 1 = 183）。
+Expected: 全綠（175 + 8 + 1 = 184）。
 
 - [ ] **Step 5: Commit**
 
@@ -1709,7 +1795,7 @@ Expected: 編譯失敗（VM 無第六、七參數/屬性/命令）。
 
 - [ ] **Step 4: 執行測試，確認通過**
 
-Run: `dotnet test tests/MousePilot.Tests`（183 + 4 = 187 全綠）、`dotnet build -c Release`（0 error 0 warning）。
+Run: `dotnet test tests/MousePilot.Tests`（184 + 4 = 188 全綠）、`dotnet build -c Release`（0 error 0 warning）。
 
 - [ ] **Step 5: Commit**
 
@@ -1755,7 +1841,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
 
 ## Phase 7 完成定義
 
-- [ ] build 0 error、測試全綠（預期 187）、publish 成功。
+- [ ] build 0 error、測試全綠（預期 188）、publish 成功。
 - [ ] 單元測試涵蓋：裁切/去背（Chebyshev 邊界）/等比置中、.cur 寫讀往返（像素+hotspot）、損毀/截斷降級、ANI 首格、16 圖案結構與可繪製性、匯入落地/編號/損毀清理/Remove 目錄防護、收藏 round-trip、VM 匯入/取消/失敗/移除。
 - [ ] **使用者實機手動驗證（規格 §34 案例 13~17）：**
   1. 匯入 PNG（含透明）→ 顯示檔名與尺寸、檔案出現在 `%AppData%\MousePilot\Cursors\`（案例 13）。
