@@ -94,4 +94,16 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal(5, loaded.IdleStartSeconds);
         Assert.Equal(100, loaded.MovementPixels);
     }
+
+    [Fact]
+    public void 收藏清單可保存與載回()
+    {
+        var service = new SettingsService(SettingsPath);
+        service.Save(new AppSettings { FavoriteCursors = { "preset:Heart", "file:cat.png" } });
+
+        var loaded = new SettingsService(SettingsPath).Load().Settings;
+
+        Assert.Equal(new[] { "preset:Heart", "file:cat.png" }, loaded.FavoriteCursors);
+        Assert.Contains("\"favoriteCursors\"", File.ReadAllText(SettingsPath));
+    }
 }

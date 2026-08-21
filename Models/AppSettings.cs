@@ -26,6 +26,7 @@ public class AppSettings
     public bool CustomCursorEnabled { get; set; }
     public string CursorFile { get; set; } = "";
     public string CursorPreset { get; set; } = "";
+    public List<string> FavoriteCursors { get; set; } = new();
     public int CursorSize { get; set; } = 32;
     public int CursorHotspotX { get; set; }
     public int CursorHotspotY { get; set; }
