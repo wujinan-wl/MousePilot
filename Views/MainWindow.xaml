@@ -129,12 +129,18 @@
             <Border Style="{StaticResource Card}">
                 <StackPanel>
                     <TextBlock Text="游標設定" Style="{StaticResource CardTitle}"/>
-                    <TextBlock Text="自訂游標功能將在 Phase 7~9 提供。" Foreground="#6B7280"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                        <Button Content="匯入圖片" IsEnabled="False" Padding="12,6" Margin="0,0,8,0"/>
-                        <Button Content="套用" IsEnabled="False" Padding="12,6" Margin="0,0,8,0"/>
-                        <Button Content="恢復 Windows 游標" IsEnabled="False" Padding="12,6"/>
+                    <TextBlock Foreground="#6B7280" Margin="0,0,0,8">
+                        <Run Text="已匯入："/><Run Text="{Binding CursorFileText, Mode=OneWay}"/>
+                    </TextBlock>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="匯入圖片" Command="{Binding ImportCursorCommand}" Padding="12,6" Margin="0,0,8,0"/>
+                        <Button Content="移除圖片" Command="{Binding RemoveCursorCommand}" Padding="12,6" Margin="0,0,8,0"/>
+                        <Button Content="套用" IsEnabled="False" Padding="12,6" Margin="0,0,8,0"
+                                ToolTip="Phase 9 提供"/>
+                        <Button Content="恢復 Windows 游標" IsEnabled="False" Padding="12,6"
+                                ToolTip="Phase 9 提供"/>
                     </StackPanel>
+                    <TextBlock Text="預設圖案庫與預覽將於後續版本提供。" Foreground="#9CA3AF" Margin="0,8,0,0" FontSize="11"/>
                 </StackPanel>
             </Border>
 

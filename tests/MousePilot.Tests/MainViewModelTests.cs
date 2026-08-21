@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 using MousePilot.Models;
@@ -535,5 +536,105 @@ public sealed class MainViewModelTests : IDisposable
         hotkeys.Service.SimulatePress(MainViewModel.RestoreCursorHotkeyId);
 
         Assert.Contains("自訂游標", vm.Notice);
+    }
+
+    private sealed class FakeCursorImportService : CursorImportService
+    {
+        public CursorImportResult NextResult = new(true, @"C:\store\cat.png", null, 32, 32);
+        public List<string> Imported { get; } = new();
+        public List<string> Removed { get; } = new();
+
+        public FakeCursorImportService() : base(@"C:\store") { }
+
+        public override CursorImportResult Import(string sourcePath)
+        {
+            Imported.Add(sourcePath);
+            return NextResult;
+        }
+
+        public override bool Remove(string storedPath)
+        {
+            Removed.Add(storedPath);
+            return true;
+        }
+    }
+
+    private MainViewModel CreateVmWithCursor(FakeCursorImportService cursor, string? pickedFile)
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(SettingsPath, "{\"autoStartMonitoring\": false, \"idleStartSeconds\": 5}");
+        var clock = new TestClock();
+        return new MainViewModel(new SettingsService(SettingsPath),
+            s => new IdleDetectionService(s, () => clock.Now, () => clock.LastInput, () => (0, 0)),
+            (s, idle) => new MouseMovementService(
+                s, idle,
+                cursorProvider: () => (0, 0),
+                boundsProvider: () => new ScreenBounds(0, 0, 1920, 1080),
+                sendMove: (_, _) => true,
+                correctPosition: (_, _) => true,
+                lastInputProvider: () => 0u,
+                delay: (_, _) => Task.CompletedTask,
+                randomIndexProvider: () => 0),
+            new NoOpStartupService(),
+            new HotkeyHarness().Service,
+            cursor,
+            () => pickedFile);
+    }
+
+    [Fact]
+    public void 匯入游標圖片成功更新設定與顯示()
+    {
+        var cursor = new FakeCursorImportService();
+        var vm = CreateVmWithCursor(cursor, @"C:\pics\cat.png");
+
+        vm.ImportCursorCommand.Execute(null);
+
+        Assert.Equal(@"C:\pics\cat.png", cursor.Imported.Single());
+        Assert.Equal(@"C:\store\cat.png", vm.Settings.CursorFile);
+        Assert.Equal("cat.png（32x32）", vm.CursorFileText);
+        Assert.True(vm.RemoveCursorCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void 取消選檔不做任何事()
+    {
+        var cursor = new FakeCursorImportService();
+        var vm = CreateVmWithCursor(cursor, pickedFile: null);
+
+        vm.ImportCursorCommand.Execute(null);
+
+        Assert.Empty(cursor.Imported);
+        Assert.Equal("", vm.Settings.CursorFile);
+    }
+
+    [Fact]
+    public void 匯入失敗顯示提示不更新設定()
+    {
+        var cursor = new FakeCursorImportService
+        {
+            NextResult = new CursorImportResult(false, null, "圖片損毀或格式不支援。", null, null),
+        };
+        var vm = CreateVmWithCursor(cursor, @"C:\pics\broken.png");
+
+        vm.ImportCursorCommand.Execute(null);
+
+        Assert.Equal("", vm.Settings.CursorFile);
+        Assert.Contains("損毀", vm.Notice);
+        Assert.False(vm.RemoveCursorCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void 移除游標圖片刪檔並清空設定()
+    {
+        var cursor = new FakeCursorImportService();
+        var vm = CreateVmWithCursor(cursor, @"C:\pics\cat.png");
+        vm.ImportCursorCommand.Execute(null);
+
+        vm.RemoveCursorCommand.Execute(null);
+
+        Assert.Equal(@"C:\store\cat.png", cursor.Removed.Single());
+        Assert.Equal("", vm.Settings.CursorFile);
+        Assert.Equal("未選擇", vm.CursorFileText);
+        Assert.False(vm.RemoveCursorCommand.CanExecute(null));
     }
 }

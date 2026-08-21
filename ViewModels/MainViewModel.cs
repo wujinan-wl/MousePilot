@@ -17,6 +17,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly MouseMovementService _movementService;
     private readonly StartupService _startupService;
     private readonly HotkeyService _hotkeyService;
+    private readonly CursorImportService _cursorImportService;
+    private readonly Func<string?> _cursorFilePicker;
     private CancellationTokenSource? _moveCts;
     private bool _moving;
     private bool _movingFromAutoCycle;
@@ -52,12 +54,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private int _triggerCount;
 
+    [ObservableProperty]
+    private string _cursorFileText = "未選擇";
+
     public MainViewModel(
         SettingsService settingsService,
         Func<AppSettings, IdleDetectionService>? idleServiceFactory = null,
         Func<AppSettings, IdleDetectionService, MouseMovementService>? movementServiceFactory = null,
         StartupService? startupService = null,
-        HotkeyService? hotkeyService = null)
+        HotkeyService? hotkeyService = null,
+        CursorImportService? cursorImportService = null,
+        Func<string?>? cursorFilePicker = null)
     {
         _settingsService = settingsService;
         var result = settingsService.Load();
@@ -90,6 +97,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _hotkeyService.HotkeyPressed += OnHotkeyPressed;
         RegisterHotkeyFromSettings(ToggleHotkeyId, Settings.ToggleHotkey, "啟動/暫停");
         RegisterHotkeyFromSettings(RestoreCursorHotkeyId, Settings.RestoreCursorHotkey, "恢復游標");
+
+        _cursorImportService = cursorImportService ?? new CursorImportService();
+        _cursorFilePicker = cursorFilePicker ?? PickCursorFile;
+        RefreshCursorFileText();
 
         IdleService.Ticked += OnTicked;
         IdleService.MoveRequested += OnMoveRequested;
@@ -217,6 +228,67 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         get => Settings.RestoreCursorHotkey;
         set => TrySetHotkey(value, isToggle: false);
+    }
+
+    /// <summary>匯入游標圖片（規格 §7/§8；套用到 Windows 全域為 Phase 9）。</summary>
+    [RelayCommand]
+    private void ImportCursor()
+    {
+        if (_cursorFilePicker() is not { } path)
+        {
+            return; // 使用者取消選檔
+        }
+
+        var result = _cursorImportService.Import(path);
+        if (!result.Success)
+        {
+            Notice = result.Error ?? "匯入失敗。";
+            return;
+        }
+
+        Settings.CursorFile = result.StoredPath!;
+        Settings.CursorPreset = "";
+        _lastImportSize = (result.Width, result.Height);
+        RefreshCursorFileText();
+        RemoveCursorCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRemoveCursor))]
+    private void RemoveCursor()
+    {
+        _cursorImportService.Remove(Settings.CursorFile);
+        Settings.CursorFile = "";
+        _lastImportSize = (null, null);
+        RefreshCursorFileText();
+        RemoveCursorCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool CanRemoveCursor() => Settings.CursorFile.Length > 0;
+
+    private (int? Width, int? Height) _lastImportSize;
+
+    private void RefreshCursorFileText()
+    {
+        if (Settings.CursorFile.Length == 0)
+        {
+            CursorFileText = "未選擇";
+            return;
+        }
+
+        var name = System.IO.Path.GetFileName(Settings.CursorFile);
+        CursorFileText = _lastImportSize.Width is { } w && _lastImportSize.Height is { } h
+            ? $"{name}（{w}x{h}）"
+            : name;
+    }
+
+    private static string? PickCursorFile()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "選擇游標圖片",
+            Filter = "游標與圖片|*.png;*.jpg;*.jpeg;*.bmp;*.cur;*.ani|所有檔案|*.*",
+        };
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
     private void TrySetHotkey(string text, bool isToggle)
