@@ -257,4 +257,116 @@ public sealed class MainViewModelTests : IDisposable
         Assert.Null(ex);
         Assert.Contains("保存失敗", vm.Notice);
     }
+
+    private sealed class FailingStartupService : StartupService
+    {
+        public FailingStartupService() : base(@"C:\Apps\MousePilot.exe", @"Software\MousePilotTests\unused\Run") { }
+
+        public override bool Enable() => false;
+
+        public override bool Disable() => false;
+
+        public override bool? IsEnabled() => null;
+    }
+
+    private string _startupTestRoot = "";
+
+    private StartupService CreateStartupService(string exePath = @"C:\Apps\MousePilot.exe")
+    {
+        if (_startupTestRoot.Length == 0)
+        {
+            _startupTestRoot = @"Software\MousePilotTests\" + Guid.NewGuid().ToString("N");
+        }
+
+        return new StartupService(exePath, _startupTestRoot + @"\Run");
+    }
+
+    private void CleanupStartupKey()
+    {
+        if (_startupTestRoot.Length > 0)
+        {
+            try
+            {
+                Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(_startupTestRoot, throwOnMissingSubKey: false);
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+        }
+    }
+
+    [Fact]
+    public void 勾選開機自啟寫入Registry並更新設定()
+    {
+        try
+        {
+            var startup = CreateStartupService();
+            var vm = CreateVmWithStartup(startup);
+
+            vm.RunAtStartup = true;
+
+            Assert.True(vm.Settings.RunAtStartup);
+            Assert.True(startup.IsEnabled());
+
+            vm.RunAtStartup = false;
+
+            Assert.False(vm.Settings.RunAtStartup);
+            Assert.False(startup.IsEnabled());
+        }
+        finally
+        {
+            CleanupStartupKey();
+        }
+    }
+
+    [Fact]
+    public void Registry失敗時顯示提示且值不變()
+    {
+        var vm = CreateVmWithStartup(new FailingStartupService());
+
+        vm.RunAtStartup = true;
+
+        Assert.False(vm.Settings.RunAtStartup);   // 失敗 → 不更新
+        Assert.False(vm.RunAtStartup);            // checkbox 讀回仍為 false
+        Assert.Contains("開機自動啟動", vm.Notice);
+    }
+
+    [Fact]
+    public void 啟動時同步Registry實際狀態並修復路徑()
+    {
+        try
+        {
+            CreateStartupService(@"C:\Old\MousePilot.exe").Enable(); // 外部已註冊、路徑過期
+            var current = CreateStartupService(@"D:\New\MousePilot.exe");
+
+            var vm = CreateVmWithStartup(current);                    // settings 檔內 runAtStartup 未設（false）
+
+            Assert.True(vm.Settings.RunAtStartup);                    // 回填實際狀態
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(_startupTestRoot + @"\Run");
+            Assert.Equal("\"D:\\New\\MousePilot.exe\"", key!.GetValue("MousePilot")); // 路徑已修復
+        }
+        finally
+        {
+            CleanupStartupKey();
+        }
+    }
+
+    private MainViewModel CreateVmWithStartup(StartupService startup)
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(SettingsPath, "{\"autoStartMonitoring\": false, \"idleStartSeconds\": 5}");
+        var clock = new TestClock();
+        return new MainViewModel(new SettingsService(SettingsPath),
+            s => new IdleDetectionService(s, () => clock.Now, () => clock.LastInput, () => (0, 0)),
+            (s, idle) => new MouseMovementService(
+                s, idle,
+                cursorProvider: () => (0, 0),
+                boundsProvider: () => new ScreenBounds(0, 0, 1920, 1080),
+                sendMove: (_, _) => true,
+                correctPosition: (_, _) => true,
+                lastInputProvider: () => 0u,
+                delay: (_, _) => Task.CompletedTask,
+                randomIndexProvider: () => 0),
+            startup);
+    }
 }

@@ -12,6 +12,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 {
     private readonly SettingsService _settingsService;
     private readonly MouseMovementService _movementService;
+    private readonly StartupService _startupService;
     private CancellationTokenSource? _moveCts;
     private bool _moving;
     private bool _movingFromAutoCycle;
@@ -50,7 +51,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public MainViewModel(
         SettingsService settingsService,
         Func<AppSettings, IdleDetectionService>? idleServiceFactory = null,
-        Func<AppSettings, IdleDetectionService, MouseMovementService>? movementServiceFactory = null)
+        Func<AppSettings, IdleDetectionService, MouseMovementService>? movementServiceFactory = null,
+        StartupService? startupService = null)
     {
         _settingsService = settingsService;
         var result = settingsService.Load();
@@ -64,6 +66,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         IdleService = (idleServiceFactory ?? (s => new IdleDetectionService(s)))(Settings);
         _movementService = (movementServiceFactory ?? ((s, i) => new MouseMovementService(s, i)))(Settings, IdleService);
+
+        _startupService = startupService ?? new StartupService();
+        // Registry 為此設定的真實來源：回填實際狀態；已註冊則冪等重寫目前 EXE 路徑（修復移動後失效）
+        if (_startupService.IsEnabled() is { } registered)
+        {
+            Settings.RunAtStartup = registered;
+            if (registered)
+            {
+                _startupService.Enable();
+            }
+        }
+
         IdleService.Ticked += OnTicked;
         IdleService.MoveRequested += OnMoveRequested;
 
@@ -149,6 +163,33 @@ public partial class MainViewModel : ObservableObject, IDisposable
         };
         StartCommand.NotifyCanExecuteChanged();
         PauseCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>開機自啟（規格 §15）：先寫 Registry、成功才更新設定；失敗顯示提示並讓 checkbox 還原。</summary>
+    public bool RunAtStartup
+    {
+        get => Settings.RunAtStartup;
+        set
+        {
+            if (value == Settings.RunAtStartup)
+            {
+                return;
+            }
+
+            var ok = value ? _startupService.Enable() : _startupService.Disable();
+            if (ok)
+            {
+                Settings.RunAtStartup = value;
+            }
+            else
+            {
+                Notice = value
+                    ? "無法寫入開機自動啟動設定（Registry 存取被拒）。"
+                    : "無法移除開機自動啟動設定（Registry 存取被拒）。";
+            }
+
+            OnPropertyChanged(); // 失敗時 getter 仍回舊值 → checkbox 還原
+        }
     }
 
     public void SaveSettings()
