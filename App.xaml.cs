@@ -5,7 +5,7 @@ using MousePilot.Views;
 
 namespace MousePilot;
 
-public partial class App : System.Windows.Application
+public partial class App : Application
 {
     private MainViewModel? _mainViewModel;
 
