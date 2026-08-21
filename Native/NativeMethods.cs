@@ -62,6 +62,10 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     private static extern bool SetCursorPos(int X, int Y);
 
+    /// <summary>釋放 GetHicon 產生的 icon handle（Bitmap.GetHicon 不會自動釋放）。</summary>
+    [DllImport("user32.dll")]
+    internal static extern bool DestroyIcon(IntPtr hIcon);
+
     /// <summary>最後一次輸入的 tick（毫秒）。失敗時回傳目前 tick——視為「剛有輸入」的保守值，確保不誤觸發移動（規格 §40-1）。</summary>
     internal static uint GetLastInputTick()
     {
