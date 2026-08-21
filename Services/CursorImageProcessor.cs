@@ -80,6 +80,7 @@ public static class CursorImageProcessor
     {
         var clone = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppArgb);
         using var g = Graphics.FromImage(clone);
+        g.CompositingMode = CompositingMode.SourceCopy; // 原值複製，杜絕半透明像素經 SourceOver 混合的取整失真（review 加固）
         g.DrawImageUnscaled(source, 0, 0);
         return clone;
     }
