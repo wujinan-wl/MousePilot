@@ -65,11 +65,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    private void OnTicked(IdleTickResult result, (int X, int Y) cursor)
+    private void OnTicked(IdleTickResult result, (int X, int Y)? cursor)
     {
         Status = result.State;
         IdleSeconds = result.IdleSeconds;
-        MousePosition = $"X={cursor.X}, Y={cursor.Y}";
+        MousePosition = cursor is { } c ? $"X={c.X}, Y={c.Y}" : "—";
         FirstTriggerText = result.SecondsUntilFirstTrigger is { } f ? $"{f:F0} 秒" : "—";
         NextMoveText = result.SecondsUntilNextMove is { } n ? $"{n:F0} 秒" : "—";
     }

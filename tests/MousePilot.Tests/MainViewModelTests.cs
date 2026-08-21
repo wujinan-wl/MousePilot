@@ -85,6 +85,18 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     [Fact]
+    public void 游標讀取失敗時顯示破折號()
+    {
+        var clock = new TestClock();
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(SettingsPath, "{\"autoStartMonitoring\": true, \"idleStartSeconds\": 5}");
+        var vm = new MainViewModel(new SettingsService(SettingsPath),
+            s => new IdleDetectionService(s, () => clock.Now, () => clock.LastInput, () => null));
+        vm.IdleService.PollNow();
+        Assert.Equal("—", vm.MousePosition);
+    }
+
+    [Fact]
     public void 暫停與啟動命令切換狀態()
     {
         var vm = CreateVm(autoStart: true, new TestClock());

@@ -15,10 +15,10 @@ public sealed class IdleDetectionService : IDisposable
     private readonly AppSettings _settings;
     private readonly Func<uint> _tickProvider;
     private readonly Func<uint> _lastInputProvider;
-    private readonly Func<(int X, int Y)> _cursorProvider;
+    private readonly Func<(int X, int Y)?> _cursorProvider;
     private readonly DispatcherTimer _timer;
 
-    public event Action<IdleTickResult, (int X, int Y)>? Ticked;
+    public event Action<IdleTickResult, (int X, int Y)?>? Ticked;
     public event Action? MoveRequested;
 
     public MonitorStatus State => _machine.State;
@@ -27,7 +27,7 @@ public sealed class IdleDetectionService : IDisposable
         AppSettings settings,
         Func<uint>? tickProvider = null,
         Func<uint>? lastInputProvider = null,
-        Func<(int X, int Y)>? cursorProvider = null)
+        Func<(int X, int Y)?>? cursorProvider = null)
     {
         _settings = settings;
         _tickProvider = tickProvider ?? (() => (uint)Environment.TickCount);
