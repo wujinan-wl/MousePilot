@@ -102,6 +102,7 @@
 - **風險：** Hotkey 需要 HWND 訊息迴圈——掛在隱藏訊息視窗上，避免依賴 MainWindow 存在。
 - **移交事項（Phase 2 ledger）：** 本階段開始有程式改設定值 → AppSettings 需 INPC 化（或 VM 包裝屬性），順帶解決「StartMonitoring 的 Clamp 改值後 UI 不刷新」問題。
 - **移交事項（Phase 4 final review）：** Tray 選單的 Start/Pause 以 `Execute(null)` 直呼、未檢查 CanExecute（選單開著跨狀態轉換時可能 stale）——hotkey 啟停實作時一併在兩處呼叫點加 `CanExecute` guard。
+- **完成註記（final review）：** (a) AppSettings INPC 化採 VM 包裝屬性方案（僅 hotkey 兩屬性）——移交事項的另一半「StartMonitoring 的 Clamp 改值後 UI 不刷新」**未解決，重新移交 Phase 11**；(b) Tray CanExecute guard 已落實；(c) 快捷鍵設定為嚴格大小寫正規格式（手改 settings.json 小寫會判無效並停用該鍵，Phase 12 使用說明需記載格式）。
 
 ## Phase 7：Cursor Import（含內建圖案庫）
 
@@ -121,6 +122,7 @@
 - **目標：** CursorService 系統半邊：`SetSystemCursor` 套用、`SystemParametersInfo(SPI_SETCURSORS)` 恢復；所有退出路徑掛恢復（按鈕、Tray、程式結束、未處理例外、SessionEnding）；Tray 游標選單項啟用。依 Phase 0 Spike B 結論實作。
 - **測試項目：** 規格 §34 案例 20~22；手動測正常關閉/Tray Exit/登出。
 - **風險：** 本專案最高風險點——實作順序固定為「恢復路徑先寫先測，替換後寫」。
+- **移交事項（Phase 6 final review）：** (a) F10 佔位分支在 `MainViewModel.OnHotkeyPressed`（接縫清楚，替換為真實恢復動作）；(b) 預設 tray-only 狀態下 hotkey 回饋（Notice）不可見——考慮 tray balloon 或同等機制讓 F10/占用提示在無視窗時可見。
 
 ## Phase 10：Single Instance
 
@@ -135,6 +137,7 @@
 - **風險：** 例外 handler 內再拋例外——handler 必須自身 try/catch 到底。
 - **移交事項（Phase 2 ledger）：** (a) `MonitorStatus` 需擴充 `Error` 值 + XAML 紅色狀態點（規格 §28）；(b) 全域 handler 必須涵蓋 Dispatcher 例外（DispatcherTimer 事件路徑目前無防護）。
 - **移交事項（Phase 3 ledger）：** (c) `MouseMovementService.ExecuteMoveAsync` 回傳 bare bool，無法區分「取消/Win32 失敗/保守放棄」——接 log 時需改 reason enum 或注入 log callback（簽章變更要規劃，不要現場發現）；(d) VM `_moving` 防重入的靜默丟棄應記 log。
+- **移交事項（Phase 6 final review）：** (f) 「StartMonitoring 的 Clamp 改值後 UI 不刷新」（數值 TextBox 直綁非 INPC 的 Settings.*，Clamp 後畫面殘留舊值）——INPC 化或 VM 數值包裝屬性，本階段回頭整理錯誤呈現時一併解；(g) HotkeyService WndProc 的 handler 例外需納入 Dispatcher 全域 handler 涵蓋範圍；(h) RegisterHotKey 失敗訊息一律「被占用」——可用 Marshal.GetLastWin32Error 區分 1409 與其他錯誤，且查重應比較 Parse 結果而非字串（手改 settings 修飾鍵順序不同時的誤報）。
 - **移交事項（Phase 4 final review）：** (e) 未處理例外 crash 會跳過 OnExit → ghost tray icon + 設定未保存；預設 tray-only 模式下例外風險升高——全域 handler 必須包含 Tray.Dispose 與 SaveSettings（連同既有的恢復游標要求）。
 
 ## Phase 12：Publish + 文件交付

@@ -340,7 +340,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _moveCts?.Cancel();        // §30：結束時取消所有背景動作（含 300ms 返回等待）
-        _hotkeyService.Dispose();  // §30 步驟 4：Unregister Global Hotkey
+        _hotkeyService.Dispose();  // §30 步驟 4：Unregister Global Hotkey（刻意先於步驟 3 的 timer 停止——先解除輸入觸發源）
         IdleService.Dispose();
     }
 }

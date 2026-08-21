@@ -81,7 +81,7 @@ public partial class App : Application
         }
     }
 
-    /// <summary>安全結束流程（規格 §30 現階段子集；hotkey/cursor/mutex 由 Phase 6/9/10 插入對應步驟）。</summary>
+    /// <summary>安全結束流程（規格 §30 現階段子集；cursor/mutex 由 Phase 9/10 插入對應步驟）。</summary>
     private void ExitApplication()
     {
         if (_exiting)
@@ -90,7 +90,7 @@ public partial class App : Application
         }
 
         _exiting = true;
-        _mainViewModel?.Dispose();      // 1~3：取消進行中移動、停止輪詢 timer
+        _mainViewModel?.Dispose();      // 1~4：取消進行中移動、解除快捷鍵、停止輪詢 timer
         _tray?.Dispose();               // 6：系統匣圖示
         _mainViewModel?.SaveSettings(); // 7：保存設定
         Shutdown();                     // 9：關閉程式
