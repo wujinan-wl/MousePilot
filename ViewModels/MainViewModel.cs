@@ -19,6 +19,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly HotkeyService _hotkeyService;
     private readonly CursorImportService _cursorImportService;
     private readonly Func<string?> _cursorFilePicker;
+    private readonly Func<byte[], string?>? _confirmedCurWriter;
     private Func<CursorEditorViewModel, bool?>? _cursorEditorLauncher;
     private CancellationTokenSource? _moveCts;
     private bool _moving;
@@ -66,9 +67,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         HotkeyService? hotkeyService = null,
         CursorImportService? cursorImportService = null,
         Func<string?>? cursorFilePicker = null,
-        Func<CursorEditorViewModel, bool?>? cursorEditorLauncher = null)
+        Func<CursorEditorViewModel, bool?>? cursorEditorLauncher = null,
+        Func<byte[], string?>? confirmedCurWriter = null)
     {
         _cursorEditorLauncher = cursorEditorLauncher;
+        _confirmedCurWriter = confirmedCurWriter;
         _settingsService = settingsService;
         var result = settingsService.Load();
         Settings = result.Settings;
@@ -287,7 +290,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             return; // 尚未接上 View（防呆，不當機）
         }
 
-        var editorVm = new CursorEditorViewModel(Settings);
+        var editorVm = new CursorEditorViewModel(Settings, confirmedWriter: _confirmedCurWriter);
         if (_cursorEditorLauncher(editorVm) == true)
         {
             SaveSettings();

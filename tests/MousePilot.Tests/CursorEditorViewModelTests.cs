@@ -27,12 +27,14 @@ public sealed class CursorEditorViewModelTests : IDisposable
     private CursorEditorViewModel Create(
         AppSettings? settings = null,
         Func<string, Bitmap?>? imageLoader = null,
-        IReadOnlyList<string>? storedFiles = null)
+        IReadOnlyList<string>? storedFiles = null,
+        Func<byte[], string?>? confirmedWriter = null)
         => new(
             settings ?? new AppSettings(),
             imageLoader ?? (_ => Track(MakeOpaque(20, 10))),
             () => storedFiles ?? Array.Empty<string>(),
-            _ => null); // 測試不建真實 WPF Cursor
+            _ => null, // 測試不建真實 WPF Cursor
+            confirmedWriter ?? (_ => @"C:\confirmed\confirmed-cursor.cur")); // 測試安全 fake：不落地
 
     private static Bitmap MakeOpaque(int w, int h)
     {
@@ -271,5 +273,75 @@ public sealed class CursorEditorViewModelTests : IDisposable
         vm.RemoveBackgroundEnabled = true; // 全背景 → 退化 → CurrentCurBytes = null
 
         Assert.False(vm.ConfirmCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void 確認時落地confirmed游標檔並記路徑()
+    {
+        byte[]? written = null;
+        var settings = new AppSettings();
+        var vm = Create(settings, confirmedWriter: b => { written = b; return @"C:\appdata\confirmed-cursor.cur"; });
+        vm.SelectedSource = vm.Sources.First(s => s.Source.Id == "preset:Heart");
+
+        vm.ConfirmCommand.Execute(null);
+
+        Assert.Equal(vm.CurrentCurBytes, written);
+        Assert.Equal(@"C:\appdata\confirmed-cursor.cur", settings.ConfirmedCursorFile);
+        Assert.True(vm.Confirmed);
+    }
+
+    [Fact]
+    public void 確認cur檔來源記原路徑不寫檔()
+    {
+        using var bmp = MakeOpaque(8, 8);
+        var dir = Path.Combine(Path.GetTempPath(), "MousePilotEditorTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var curPath = Path.Combine(dir, "x.cur");
+        File.WriteAllBytes(curPath, CurFileFormat.Write(bmp, 2, 3));
+        try
+        {
+            var called = false;
+            var settings = new AppSettings();
+            var vm = Create(settings, storedFiles: new[] { curPath }, confirmedWriter: _ => { called = true; return "x"; });
+            vm.SelectedSource = vm.Sources.First(s => s.Source.Kind == CursorSourceKind.CursorFile);
+
+            vm.ConfirmCommand.Execute(null);
+
+            Assert.False(called); // .cur/.ani 原檔直接套用（.ani 動畫靠 LoadCursorFromFile 原生支援）
+            Assert.Equal(curPath, settings.ConfirmedCursorFile);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void 寫檔失敗時不確認不關閉()
+    {
+        var settings = new AppSettings();
+        var vm = Create(settings, confirmedWriter: _ => null);
+        vm.SelectedSource = vm.Sources.First(s => s.Source.Id == "preset:Star");
+        var closed = false;
+        vm.CloseRequested += () => closed = true;
+
+        vm.ConfirmCommand.Execute(null);
+
+        Assert.False(vm.Confirmed);
+        Assert.False(closed);
+        Assert.Contains("寫入失敗", vm.Warning);
+        Assert.Equal("", settings.ConfirmedCursorFile);
+    }
+
+    [Fact]
+    public void 套用命令確認並標記套用請求()
+    {
+        var vm = Create();
+        vm.SelectedSource = vm.Sources.First(s => s.Source.Id == "preset:Dot");
+
+        vm.ConfirmAndApplyCommand.Execute(null);
+
+        Assert.True(vm.Confirmed);
+        Assert.True(vm.ApplyRequested);
     }
 }

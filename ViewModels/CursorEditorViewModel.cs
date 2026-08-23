@@ -38,6 +38,7 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
     private readonly AppSettings _settings;
     private readonly Func<string, Bitmap?> _imageLoader;
     private readonly Func<byte[], System.Windows.Input.Cursor?> _cursorFactory;
+    private readonly Func<byte[], string?> _confirmedWriter;
     private bool _applyingDefaults;
     private Bitmap? _loadedSource;
     private string? _loadedSourcePath;
@@ -48,11 +49,13 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
         AppSettings settings,
         Func<string, Bitmap?>? imageLoader = null,
         Func<IReadOnlyList<string>>? storedFilesProvider = null,
-        Func<byte[], System.Windows.Input.Cursor?>? cursorFactory = null)
+        Func<byte[], System.Windows.Input.Cursor?>? cursorFactory = null,
+        Func<byte[], string?>? confirmedWriter = null)
     {
         _settings = settings;
         _imageLoader = imageLoader ?? LoadBitmap;
         _cursorFactory = cursorFactory ?? CreateCursor;
+        _confirmedWriter = confirmedWriter ?? WriteConfirmedCur;
         var storedFiles = (storedFilesProvider ?? DefaultStoredFiles)();
 
         Sources = new ObservableCollection<CursorSourceItem>(BuildSources(storedFiles));
@@ -220,6 +223,23 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
     private void Confirm()
     {
         var source = SelectedSource!.Source;
+        if (source.Kind == CursorSourceKind.CursorFile)
+        {
+            // 原檔直接套用（移交 (f)/(i)：.ani 由 LoadCursorFromFile 原生支援；size/hotspot 為顯示殘值不參與）
+            _settings.ConfirmedCursorFile = source.FilePath!;
+        }
+        else
+        {
+            var written = _confirmedWriter(CurrentCurBytes!);
+            if (written is null)
+            {
+                Warning = "游標檔寫入失敗，無法確認選擇。";
+                return; // 不設 Confirmed、不關閉（規格 §21）
+            }
+
+            _settings.ConfirmedCursorFile = written;
+        }
+
         if (source.Kind == CursorSourceKind.Preset)
         {
             _settings.CursorPreset = source.Id["preset:".Length..];
@@ -236,6 +256,36 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
         _settings.CursorHotspotY = HotspotY;
         Confirmed = true;
         CloseRequested?.Invoke();
+    }
+
+    public bool ApplyRequested { get; private set; }
+
+    [RelayCommand(CanExecute = nameof(CanConfirm))]
+    private void ConfirmAndApply()
+    {
+        ApplyRequested = true;
+        Confirm();
+        if (!Confirmed)
+        {
+            ApplyRequested = false; // 確認失敗（寫檔失敗）→ 撤回套用請求
+        }
+    }
+
+    /// <summary>production 落地路徑：%AppData%\MousePilot\confirmed-cursor.cur（根目錄，避免被 gallery 列舉）。</summary>
+    private static string? WriteConfirmedCur(byte[] bytes)
+    {
+        try
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MousePilot");
+            Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, "confirmed-cursor.cur");
+            File.WriteAllBytes(path, bytes);
+            return path;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     private bool CanConfirm() => SelectedSource is not null && CurrentCurBytes is not null;

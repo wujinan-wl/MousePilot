@@ -442,7 +442,8 @@ public sealed class MainViewModelTests : IDisposable
                 delay: (_, _) => Task.CompletedTask,
                 randomIndexProvider: () => 0),
             startup,
-            hotkey ?? new HotkeyHarness().Service);
+            hotkey ?? new HotkeyHarness().Service,
+            confirmedCurWriter: _ => Path.Combine(_dir, "confirmed-cursor.cur"));
     }
 
     [Fact]
@@ -617,7 +618,8 @@ public sealed class MainViewModelTests : IDisposable
             new NoOpStartupService(),
             new HotkeyHarness().Service,
             cursor,
-            () => pickedFile);
+            () => pickedFile,
+            confirmedCurWriter: _ => Path.Combine(_dir, "confirmed-cursor.cur"));
     }
 
     [Fact]
