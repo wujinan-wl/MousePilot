@@ -70,6 +70,14 @@ public class HotkeyServiceTests
     }
 
     [Fact]
+    public void 註冊失敗記錄Win32錯誤碼()
+    {
+        var svc = new HotkeyService(registerFn: (_, _, _) => false, unregisterFn: _ => true, lastErrorFn: () => 1409);
+        Assert.False(svc.Register(1, HotkeyParser.Parse("Ctrl+Alt+F9")!.Value));
+        Assert.Equal(1409, svc.LastWin32Error);
+    }
+
+    [Fact]
     public void SimulatePress觸發事件()
     {
         var fake = new FakeRegistrar();

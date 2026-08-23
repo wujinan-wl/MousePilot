@@ -262,6 +262,39 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>開始閒置秒數包裝屬性（TextBox 直綁；StartMonitoring 的 Clamp 後刷新）。</summary>
+    public int IdleStartSecondsInput
+    {
+        get => Settings.IdleStartSeconds;
+        set
+        {
+            Settings.IdleStartSeconds = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>後續移動間隔秒數包裝屬性（TextBox 直綁；StartMonitoring 的 Clamp 後刷新）。</summary>
+    public int MovementIntervalSecondsInput
+    {
+        get => Settings.MovementIntervalSeconds;
+        set
+        {
+            Settings.MovementIntervalSeconds = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>移動像素包裝屬性（TextBox 直綁；StartMonitoring 的 Clamp 後刷新）。</summary>
+    public int MovementPixelsInput
+    {
+        get => Settings.MovementPixels;
+        set
+        {
+            Settings.MovementPixels = value;
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>啟動/暫停快捷鍵（規格 §17）。</summary>
     public string ToggleHotkeyText
     {
@@ -426,7 +459,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         var error = HotkeyParser.Validate(text);
         var other = isToggle ? Settings.RestoreCursorHotkey : Settings.ToggleHotkey;
-        if (error is null && text == other)
+        if (error is null && HotkeyParser.Parse(text) is { } parsed && HotkeyParser.Parse(other) is { } otherParsed
+            && parsed.Equals(otherParsed))
         {
             error = "快捷鍵不可與另一項重複。";
         }
@@ -469,12 +503,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (HotkeyParser.Parse(text) is not { } combo)
         {
             Notice = $"快捷鍵設定「{text}」無效，{label} 快捷鍵未啟用。";
+            _log?.Error(Notice);
             return;
         }
 
         if (!_hotkeyService.Register(id, combo))
         {
-            Notice = $"快捷鍵 {text} 已被其他程式占用，{label} 快捷鍵未啟用。";
+            var code = _hotkeyService.LastWin32Error;
+            Notice = code == 1409
+                ? $"快捷鍵 {text} 已被其他程式占用，{label} 快捷鍵未啟用。"
+                : $"快捷鍵 {text} 註冊失敗（Win32 錯誤 {code}），{label} 快捷鍵未啟用。";
+            _log?.Error(Notice);
         }
     }
 
@@ -518,6 +557,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _errorLatched = false;
         _consecutiveMoveFailures = 0;
         Settings.Clamp();
+        OnPropertyChanged(nameof(IdleStartSecondsInput));
+        OnPropertyChanged(nameof(MovementIntervalSecondsInput));
+        OnPropertyChanged(nameof(MovementPixelsInput));
         IdleService.Start();
     }
 

@@ -104,15 +104,15 @@
 
                         <TextBlock Grid.Row="0" Text="開始閒置（秒）" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Row="0" Grid.Column="1" VerticalAlignment="Center"
-                                 Text="{Binding Settings.IdleStartSeconds}"/>
+                                 Text="{Binding IdleStartSecondsInput}"/>
 
                         <TextBlock Grid.Row="1" Text="後續移動間隔（秒）" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Row="1" Grid.Column="1" VerticalAlignment="Center"
-                                 Text="{Binding Settings.MovementIntervalSeconds}"/>
+                                 Text="{Binding MovementIntervalSecondsInput}"/>
 
                         <TextBlock Grid.Row="2" Text="移動像素（px）" Style="{StaticResource FieldLabel}"/>
                         <TextBox Grid.Row="2" Grid.Column="1" VerticalAlignment="Center"
-                                 Text="{Binding Settings.MovementPixels}"/>
+                                 Text="{Binding MovementPixelsInput}"/>
 
                         <TextBlock Grid.Row="3" Text="移動模式" Style="{StaticResource FieldLabel}"/>
                         <ComboBox Grid.Row="3" Grid.Column="1" VerticalAlignment="Center"

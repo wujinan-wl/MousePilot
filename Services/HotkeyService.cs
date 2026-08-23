@@ -14,15 +14,23 @@ public sealed class HotkeyService : IDisposable
 
     private readonly Func<int, uint, uint, bool> _registerFn;
     private readonly Func<int, bool> _unregisterFn;
+    private readonly Func<int> _lastErrorFn;
     private readonly Dictionary<int, HotkeyCombo> _registered = new();
     private HwndSource? _source;
 
     public event Action<int>? HotkeyPressed;
 
-    public HotkeyService(Func<int, uint, uint, bool>? registerFn = null, Func<int, bool>? unregisterFn = null)
+    /// <summary>最近一次 Register 失敗時的 Win32 錯誤碼（成功時不更新）。</summary>
+    public int LastWin32Error { get; private set; }
+
+    public HotkeyService(
+        Func<int, uint, uint, bool>? registerFn = null,
+        Func<int, bool>? unregisterFn = null,
+        Func<int>? lastErrorFn = null)
     {
         _registerFn = registerFn ?? ((id, mod, vk) => NativeMethods.RegisterHotKey(EnsureSource(), id, mod, vk));
         _unregisterFn = unregisterFn ?? (id => NativeMethods.UnregisterHotKey(EnsureSource(), id));
+        _lastErrorFn = lastErrorFn ?? (() => System.Runtime.InteropServices.Marshal.GetLastWin32Error());
     }
 
     /// <summary>註冊（同 id 重註冊會先解除舊組合）。false = 被其他程式占用或失敗，且不留殘留註冊。</summary>
@@ -31,6 +39,7 @@ public sealed class HotkeyService : IDisposable
         Unregister(id);
         if (!_registerFn(id, combo.Modifiers, combo.VirtualKey))
         {
+            LastWin32Error = _lastErrorFn();
             return false;
         }
 

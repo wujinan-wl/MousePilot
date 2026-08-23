@@ -55,7 +55,10 @@ public sealed class MainViewModelTests : IDisposable
                     Registered.Add((id, mod, vk));
                     return true;
                 },
-                id => { Unregistered.Add(id); return true; });
+                id => { Unregistered.Add(id); return true; },
+                // 模擬真實 Win32 佔用情境（ERROR_HOTKEY_ALREADY_REGISTERED），
+                // 而非讓 HotkeyService 讀到當前執行緒殘留、不可預期的 GetLastWin32Error()
+                lastErrorFn: () => 1409);
         }
     }
 
@@ -457,6 +460,20 @@ public sealed class MainViewModelTests : IDisposable
             logService: logService);
     }
 
+    [Fact]
+    public void 啟動時夾制數值並刷新UI()
+    {
+        var vm = CreateVmWithStartup(new NoOpStartupService());
+        vm.IdleStartSecondsInput = 0; // 低於下限（TextBox 直改）
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.StartCommand.Execute(null);
+
+        Assert.Equal(5, vm.IdleStartSecondsInput); // Clamp 後包裝屬性已刷新（移交 f）
+        Assert.Contains(nameof(MainViewModel.IdleStartSecondsInput), raised);
+    }
+
     private MainViewModel CreateVmWithFailingMove(LogService? log = null)
     {
         Directory.CreateDirectory(_dir);
@@ -642,6 +659,25 @@ public sealed class MainViewModelTests : IDisposable
 
         Assert.Equal("Ctrl+Alt+F9", vm.Settings.ToggleHotkey);
         Assert.Contains("重複", vm.Notice);
+    }
+
+    [Fact]
+    public void 快捷鍵等價組合視為重複()
+    {
+        var hotkeys = new HotkeyHarness();
+        var vm = CreateVmWithStartup(new NoOpStartupService(), hotkeys.Service);
+        // RestoreCursorHotkey 預設 Ctrl+Alt+F10——用不同字串寫法的等價組合設定 Toggle
+        vm.ToggleHotkeyText = "Alt+Ctrl+F10"; // Parse 後與 Ctrl+Alt+F10 等價（修飾鍵順序不同）
+
+        Assert.Contains("重複", vm.Notice);
+    }
+
+    [Fact]
+    public void 快捷鍵註冊失敗訊息區分錯誤碼()
+    {
+        var svc = new HotkeyService(registerFn: (_, _, _) => false, unregisterFn: _ => true, lastErrorFn: () => 5);
+        var vm = CreateVmWithStartup(new NoOpStartupService(), svc);
+        Assert.Contains("Win32 錯誤 5", vm.Notice); // 非 1409 不得謊稱「被占用」
     }
 
     [Fact]
