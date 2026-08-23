@@ -512,6 +512,21 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     [Fact]
+    public void 錯誤狀態暫停後顯示已暫停且可重啟()
+    {
+        var vm = CreateVmWithFailingMove();
+        vm.StartCommand.Execute(null);
+        for (var i = 0; i < 3; i++) { vm.MoveOnceCommand.Execute(null); }
+        Assert.Equal(MonitorStatus.Error, vm.Status);
+
+        vm.PauseCommand.Execute(null);
+
+        Assert.Equal(MonitorStatus.Paused, vm.Status);
+        Assert.Equal("已暫停", vm.StatusText);
+        Assert.True(vm.StartCommand.CanExecute(null)); // UI 可重啟（review 修正）
+    }
+
+    [Fact]
     public void 移動失敗寫入log()
     {
         var dir = Path.Combine(_dir, "logs");

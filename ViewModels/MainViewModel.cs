@@ -529,6 +529,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanPause))]
     private void Pause()
     {
+        _errorLatched = false; // 暫停即解除錯誤 latch——否則 Status 永遠 Error、CanStart 永久 false（review 修正）
+        _consecutiveMoveFailures = 0;
         _moveCts?.Cancel();
         IdleService.Pause();
     }
