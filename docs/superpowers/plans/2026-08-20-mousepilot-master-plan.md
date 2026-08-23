@@ -26,7 +26,7 @@
 | 5 | Startup Registry | ✅ 完成 | `2026-08-21-phase5-startup-registry.md` |
 | 6 | Global Hotkey | ✅ 完成 | `2026-08-21-phase6-global-hotkey.md` |
 | 7 | Cursor Import（含內建圖案庫） | ✅ 完成 | `2026-08-21-phase7-cursor-import.md` |
-| 8 | Hotspot Editor + Preview | ⬜ 未開始 | 〃 |
+| 8 | Hotspot Editor + Preview | ✅ 完成 | `2026-08-23-phase8-hotspot-editor.md` |
 | 9 | Global Cursor 套用/恢復 | ⬜ 未開始 | 〃 |
 | 10 | Single Instance | ⬜ 未開始 | 〃 |
 | 11 | Exception Handling / Log | ⬜ 未開始 | 〃 |

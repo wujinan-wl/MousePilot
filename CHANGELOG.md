@@ -20,3 +20,4 @@
 - 開機自動啟動（Phase 5）：checkbox 寫入/移除 HKCU Run key（引號包覆 EXE 路徑）、啟動時與 Registry 實際狀態同步並自我修復移動後的路徑、寫入失敗不 crash（提示 + checkbox 還原）。
 - 全域快捷鍵（Phase 6）：Ctrl+Alt+F9 切換啟動/暫停、Ctrl+Alt+F10 恢復游標（佔位，隨自訂游標功能啟用）；UI 點擊欄位按鍵即可修改，無效/重複/被占用皆有提示並還原；Tray 選單啟停加上狀態防護。
 - 游標匯入（Phase 7）：支援 PNG/JPG/JPEG/BMP/CUR/ANI 匯入至 %AppData%\MousePilot\Cursors\（透明裁切/等比縮放/JPG 去背/.cur 讀寫/ANI 首格預覽，損毀不 crash）；16 個程式繪製內建圖案（基本 8 + 可愛 8，含藍色機器貓風格）；收藏資料層。
+- 游標編輯器（Phase 8）：預設圖案 Grid（16 內建 + 匯入檔案）與我的收藏、尺寸選擇、點擊設 Hotspot（十字標記/座標格/手動輸入）、JPG 去背（左上角參考色 + 容差）、雙背景模擬預覽（面板局部游標，不動全域）；移除失敗防孤兒檔案。
