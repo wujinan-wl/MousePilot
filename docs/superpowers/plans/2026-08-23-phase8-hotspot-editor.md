@@ -666,6 +666,7 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
     private System.Windows.Input.Cursor? _previewCursor;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
     private byte[]? _currentCurBytes;
 
     [ObservableProperty]
@@ -718,6 +719,14 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
 
     partial void OnHotspotXChanged(int value)
     {
+        // TextBox 直綁也會走這裡——必須夾制，否則負值經 CurFileFormat.Write 的 (ushort) 迴繞寫出損壞 cur（final review 修正）
+        var clamped = Math.Clamp(value, 0, SelectedSize - 1);
+        if (clamped != value)
+        {
+            HotspotX = clamped; // 夾制後重新觸發本 handler 一次（等值防重入）
+            return;
+        }
+
         if (!_applyingDefaults)
         {
             Rebuild();
@@ -726,6 +735,13 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
 
     partial void OnHotspotYChanged(int value)
     {
+        var clamped = Math.Clamp(value, 0, SelectedSize - 1);
+        if (clamped != value)
+        {
+            HotspotY = clamped; // 夾制後重新觸發本 handler 一次（等值防重入）
+            return;
+        }
+
         if (!_applyingDefaults)
         {
             Rebuild();
@@ -798,15 +814,17 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
         CloseRequested?.Invoke();
     }
 
-    private bool CanConfirm() => SelectedSource is not null;
+    private bool CanConfirm() => SelectedSource is not null && CurrentCurBytes is not null; // 退化/載入失敗不可確定（final review 修正）
 
     private void Rebuild()
     {
+        var oldCursor = PreviewCursor;
         Warning = "";
         CurrentCurBytes = null;
         PreviewCursor = null;
         PreviewImage = null;
         SourceSizeText = "—";
+        oldCursor?.Dispose(); // binding 已切回預設游標後才釋放舊顆（unmanaged handle，final review 修正）
         if (SelectedSource is not { } item)
         {
             return;
@@ -832,7 +850,7 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
                     break;
             }
         }
-        catch (Exception ex) when (ex is IOException or ArgumentException or OutOfMemoryException)
+        catch (Exception ex) when (ex is IOException or ArgumentException or OutOfMemoryException or UnauthorizedAccessException)
         {
             Warning = $"預覽建立失敗：{ex.Message}"; // 規格 §21：不 crash
         }
@@ -855,6 +873,8 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
     {
         _loadedSource?.Dispose();
         _loadedSource = null;
+        PreviewCursor?.Dispose();
+        PreviewCursor = null;
     }
 
     private void RebuildFromImageFile(string path)
@@ -1087,7 +1107,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
                                Width="256" Height="256" Stretch="Uniform"
                                RenderOptions.BitmapScalingMode="NearestNeighbor"
                                MouseLeftButtonDown="OnEditImageClicked"/>
-                        <Canvas x:Name="HotspotOverlay" IsHitTestVisible="False"/>
+                        <Canvas x:Name="HotspotOverlay" IsHitTestVisible="False" ClipToBounds="True"/>
                     </Grid>
                 </Border>
                 <TextBlock Margin="0,6,0,0" Foreground="#6B7280">
@@ -1458,7 +1478,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
 
 ## Phase 8 完成定義
 
-- [ ] build 0 error、測試全綠（預期 219）、publish 成功。
+- [ ] build 0 error、測試全綠（預期 219；final review 修正後 221——新增「手動輸入 Hotspot 直接夾制」「退化狀態下確定命令停用」兩測試）、publish 成功。
 - [ ] 單元測試涵蓋：來源清單/預設值/夾制/管線（含左上角參考色去背與退化警告）/cur bytes hotspot/收藏/確認互斥寫入/取消；座標換算；移除失敗防孤兒；損毀 cur 匯入。
 - [ ] **使用者實機手動驗證（規格 §34 案例 18/19 + 補三~補八）：**
   1. 「選擇 / 編輯游標」開啟編輯視窗：左側 16 圖案 Grid + 已匯入檔案。
