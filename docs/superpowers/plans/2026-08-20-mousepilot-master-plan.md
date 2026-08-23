@@ -153,7 +153,7 @@
   - ✅ 已清償（Phase 11）：(i) 三個 restore hook 已收斂為 `EmergencyShutdown`，SessionEnding 另補 `NotifySystemRestored` 刷新 VM 狀態；(j) `CursorService` marker 已改為 write-ahead（SetSystemCursor 前寫入）；(k) backlog 三件已一併清償——啟動 auto-apply 失敗會清 `CustomCursorEnabled`、tray-only 狀態通知已改 balloon 顯示、`TrayIconServiceTests` 過時測試名已改名。
 
 - **移交事項（Phase 10 final review）：** (l) `SingleInstanceService` 強化四件（併入例外處理任務）：kernel object 建立例外（`WaitHandleCannotBeOpenedException`/ACL 拒絕，發生在背景持有緒會直接殺程序）→ catch 後 fail-open（視為取得照常啟動）+ log；`ReleaseMutex` 的 catch 註解改「防禦性——重設計後理論上不會發生」；`Unregister(null)` 改 `Unregister(_wakeEvent)` 教科書收尾模式；`TryAcquire` 加重複呼叫守衛（`if (_ownerThread is not null) throw`——重複呼叫會令第一持有緒永卡）。(m) **時序不變式（完整 handler 實作時必須維持）：exception hooks 掛載必須在 mutex 取得之後**——第二實例掛了 hooks 反而會在自身出例外時清掉第一實例的游標。
-  - ✅ 已清償（Phase 11）：(l) `SingleInstanceService` 四件強化（fail-open + log、防禦性註解、`Unregister(_wakeEvent)`、`TryAcquire` 重複呼叫守衛）已全數完成；(m) 時序不變式（exception hooks 掛載於 mutex 取得之後）已維持並經 review 驗證。
+  - ✅ 已清償（Phase 11）：(l) `SingleInstanceService` 四件強化（fail-open + `AcquiredViaFailOpen` 旗標經 App 記 log〔final review 補〕、防禦性註解、`Unregister(_wakeEvent)`、`TryAcquire` 重複呼叫守衛）已全數完成；(m) 時序不變式（exception hooks 掛載於 mutex 取得之後）已維持並經 review 驗證。
 
 ## Phase 12：Publish + 文件交付
 
@@ -161,6 +161,8 @@
 - **驗收：** 規格 §39——EXE 複製到無 .NET 8 Runtime 的 Win10/11 x64 機器可直接執行。
 - **風險：** ReadyToRun/SingleFile 與 WPF 資源、embed cursor 資源的相容性；若需調整 csproj 參數要寫明原因。
 - **文件必載（Phase 9/10 final review 移交）：** (a) 快捷鍵設定檔格式為嚴格大小寫（Phase 6 註記）；(b) 單一實例行為：第二次啟動不多開、自動彈出 Dashboard；per-user——不同 Windows 使用者可各跑一份；(c) `--restore-cursor` 參數：緊急恢復游標，不受單一實例限制，可在另一實例存活時執行（會重載系統游標 scheme 的緊急覆寫語意）。
+- **文件必載（Phase 11 final review 移交）：** (d) log 路徑 `%AppData%\MousePilot\Logs\mousepilot.log`、5MB 輪替保留 3 份歸檔；(e) 狀態紅點 Error 語意：滑鼠移動連續失敗 3 次進入、成功/重新啟動/暫停解除；(f) balloon 已知限制兩則：啟動期（VM 建構中）的 Notice 不彈 balloon（log 有記錄、開 Dashboard 可見）、同文字 Notice 連續發生不重彈；(g) mutex fail-open 啟動時失去單一實例保證（log 有 ERROR 記錄可佐證）。
+- **backlog（不阻塞，機會性處理）：** OnExit fallback 路徑不記「程式結束」log（極邊緣：非 tray 正常結束才走）。
 
 ---
 
