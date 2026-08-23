@@ -26,9 +26,26 @@ public class TrayIconServiceTests
     public void 游標三項於Phase9前停用()
     {
         using var tray = Create();
-        Assert.False(tray.FindMenuItem("啟用自訂游標")!.Enabled);
-        Assert.False(tray.FindMenuItem("停用自訂游標")!.Enabled);
-        Assert.False(tray.FindMenuItem("恢復 Windows 游標")!.Enabled);
+        Assert.True(tray.FindMenuItem("啟用自訂游標")!.Enabled);
+        Assert.True(tray.FindMenuItem("停用自訂游標")!.Enabled);
+        Assert.True(tray.FindMenuItem("恢復 Windows 游標")!.Enabled);
+    }
+
+    [Fact]
+    public void 游標選單項啟用且觸發事件()
+    {
+        using var tray = new TrayIconService();
+        var events = new List<string>();
+        tray.EnableCursorRequested += () => events.Add("enable");
+        tray.DisableCursorRequested += () => events.Add("disable");
+        tray.RestoreCursorRequested += () => events.Add("restore");
+
+        Assert.True(tray.FindMenuItem("啟用自訂游標")!.Enabled);
+        tray.FindMenuItem("啟用自訂游標")!.PerformClick();
+        tray.FindMenuItem("停用自訂游標")!.PerformClick();
+        tray.FindMenuItem("恢復 Windows 游標")!.PerformClick();
+
+        Assert.Equal(new[] { "enable", "disable", "restore" }, events);
     }
 
     [Fact]

@@ -19,6 +19,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly HotkeyService _hotkeyService;
     private readonly CursorImportService _cursorImportService;
     private readonly Func<string?> _cursorFilePicker;
+    private readonly CursorService _cursorService;
     private readonly Func<byte[], string?>? _confirmedCurWriter;
     private Func<CursorEditorViewModel, bool?>? _cursorEditorLauncher;
     private CancellationTokenSource? _moveCts;
@@ -68,9 +69,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         CursorImportService? cursorImportService = null,
         Func<string?>? cursorFilePicker = null,
         Func<CursorEditorViewModel, bool?>? cursorEditorLauncher = null,
+        CursorService? cursorService = null,
         Func<byte[], string?>? confirmedCurWriter = null)
     {
         _cursorEditorLauncher = cursorEditorLauncher;
+        _cursorService = cursorService ?? new CursorService();
         _confirmedCurWriter = confirmedCurWriter;
         _settingsService = settingsService;
         var result = settingsService.Load();
@@ -107,6 +110,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _cursorImportService = cursorImportService ?? new CursorImportService();
         _cursorFilePicker = cursorFilePicker ?? PickCursorFile;
         RefreshCursorFileText();
+        RefreshCursorStatusText();
 
         IdleService.Ticked += OnTicked;
         IdleService.MoveRequested += OnMoveRequested;
@@ -229,7 +233,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         set => TrySetHotkey(value, isToggle: true);
     }
 
-    /// <summary>恢復 Windows 游標快捷鍵（動作於 Phase 9 接上）。</summary>
+    /// <summary>恢復 Windows 游標快捷鍵。</summary>
     public string RestoreCursorHotkeyText
     {
         get => Settings.RestoreCursorHotkey;
@@ -276,6 +280,43 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private bool CanRemoveCursor() => Settings.CursorFile.Length > 0;
 
+    [RelayCommand(CanExecute = nameof(CanApplyCursor))]
+    private void ApplyCursor()
+    {
+        if (_cursorService.Apply(Settings.ConfirmedCursorFile))
+        {
+            Settings.CustomCursorEnabled = true;
+            SaveSettings();
+            RefreshCursorStatusText();
+            Notice = "已套用自訂游標。";
+        }
+        else
+        {
+            Notice = "套用游標失敗（檔案可能已損毀或被移除）。";
+        }
+    }
+
+    private bool CanApplyCursor() => Settings.ConfirmedCursorFile.Length > 0;
+
+    [RelayCommand]
+    private void RestoreCursor()
+    {
+        if (_cursorService.Restore())
+        {
+            Settings.CustomCursorEnabled = false;
+            SaveSettings();
+            RefreshCursorStatusText();
+            Notice = "已恢復 Windows 游標。";
+        }
+        else
+        {
+            Notice = "恢復游標失敗，將於下次啟動自動補救。";
+        }
+    }
+
+    private void RefreshCursorStatusText()
+        => CursorStatusText = _cursorService.IsApplied ? "已套用自訂游標" : "Windows 預設";
+
     private (int? Width, int? Height) _lastImportSize;
 
     /// <summary>View 於 Loaded 時注入編輯視窗啟動器（測試直接注入 fake）。</summary>
@@ -297,6 +338,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _lastImportSize = (null, null);
             RefreshCursorFileText();
             RemoveCursorCommand.NotifyCanExecuteChanged();
+            ApplyCursorCommand.NotifyCanExecuteChanged();
+            if (editorVm.ApplyRequested)
+            {
+                ApplyCursor();
+            }
         }
     }
 
@@ -412,7 +458,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
         else if (id == RestoreCursorHotkeyId)
         {
-            Notice = "恢復 Windows 游標功能將於自訂游標功能完成後啟用。";
+            RestoreCursor();
         }
     }
 

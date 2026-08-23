@@ -425,7 +425,11 @@ public sealed class MainViewModelTests : IDisposable
         }
     }
 
-    private MainViewModel CreateVmWithStartup(StartupService startup, HotkeyService? hotkey = null)
+    private MainViewModel CreateVmWithStartup(
+        StartupService startup,
+        HotkeyService? hotkey = null,
+        CursorService? cursorService = null,
+        Func<byte[], string?>? confirmedCurWriter = null)
     {
         Directory.CreateDirectory(_dir);
         File.WriteAllText(SettingsPath, "{\"autoStartMonitoring\": false, \"idleStartSeconds\": 5}");
@@ -443,7 +447,8 @@ public sealed class MainViewModelTests : IDisposable
                 randomIndexProvider: () => 0),
             startup,
             hotkey ?? new HotkeyHarness().Service,
-            confirmedCurWriter: _ => Path.Combine(_dir, "confirmed-cursor.cur"));
+            cursorService: cursorService,
+            confirmedCurWriter: confirmedCurWriter ?? (_ => Path.Combine(_dir, "confirmed-cursor.cur")));
     }
 
     [Fact]
@@ -566,15 +571,108 @@ public sealed class MainViewModelTests : IDisposable
         Assert.Equal(MonitorStatus.Paused, vm.Status);
     }
 
-    [Fact]
-    public void F10快捷鍵顯示佔位提示()
+    private sealed class FakeCursorService : CursorService
     {
+        public bool ApplyResult = true;
+        public bool RestoreResult = true;
+        public List<string> Applied { get; } = new();
+        public int Restored;
+
+        public FakeCursorService()
+            : base(_ => IntPtr.Zero, _ => false, () => false, _ => { },
+                Path.Combine(Path.GetTempPath(), "MousePilotFakeMarker", Guid.NewGuid().ToString("N"), "m"))
+        {
+        }
+
+        public override bool Apply(string curFilePath)
+        {
+            Applied.Add(curFilePath);
+            if (ApplyResult) { IsApplied = true; }
+            return ApplyResult;
+        }
+
+        public override bool Restore()
+        {
+            Restored++;
+            if (RestoreResult) { IsApplied = false; }
+            return RestoreResult;
+        }
+    }
+
+    [Fact]
+    public void 套用游標成功更新狀態與設定()
+    {
+        var cursor = new FakeCursorService();
+        var vm = CreateVmWithStartup(new NoOpStartupService(), cursorService: cursor);
+        vm.Settings.ConfirmedCursorFile = @"C:\appdata\confirmed-cursor.cur";
+        vm.ApplyCursorCommand.NotifyCanExecuteChanged();
+
+        Assert.True(vm.ApplyCursorCommand.CanExecute(null));
+        vm.ApplyCursorCommand.Execute(null);
+
+        Assert.Equal(new[] { @"C:\appdata\confirmed-cursor.cur" }, cursor.Applied);
+        Assert.True(vm.Settings.CustomCursorEnabled);
+        Assert.Equal("已套用自訂游標", vm.CursorStatusText);
+    }
+
+    [Fact]
+    public void 套用失敗提示且不改設定()
+    {
+        var cursor = new FakeCursorService { ApplyResult = false };
+        var vm = CreateVmWithStartup(new NoOpStartupService(), cursorService: cursor);
+        vm.Settings.ConfirmedCursorFile = @"C:\appdata\confirmed-cursor.cur";
+
+        vm.ApplyCursorCommand.Execute(null);
+
+        Assert.False(vm.Settings.CustomCursorEnabled);
+        Assert.Equal("Windows 預設", vm.CursorStatusText);
+        Assert.Contains("失敗", vm.Notice);
+    }
+
+    [Fact]
+    public void 恢復游標更新狀態與設定()
+    {
+        var cursor = new FakeCursorService();
+        var vm = CreateVmWithStartup(new NoOpStartupService(), cursorService: cursor);
+        vm.Settings.ConfirmedCursorFile = @"C:\a.cur";
+        vm.ApplyCursorCommand.Execute(null);
+
+        vm.RestoreCursorCommand.Execute(null);
+
+        Assert.Equal(1, cursor.Restored);
+        Assert.False(vm.Settings.CustomCursorEnabled);
+        Assert.Equal("Windows 預設", vm.CursorStatusText);
+    }
+
+    [Fact]
+    public void F10快捷鍵恢復游標()
+    {
+        var cursor = new FakeCursorService();
         var hotkeys = new HotkeyHarness();
-        var vm = CreateVmWithStartup(new NoOpStartupService(), hotkeys.Service);
+        var vm = CreateVmWithStartup(new NoOpStartupService(), hotkeys.Service, cursorService: cursor);
 
-        hotkeys.Service.SimulatePress(MainViewModel.RestoreCursorHotkeyId);
+        hotkeys.Service.SimulatePress(MainViewModel.RestoreCursorHotkeyId); // = 2
 
-        Assert.Contains("自訂游標", vm.Notice);
+        Assert.Equal(1, cursor.Restored);
+        Assert.Contains("已恢復", vm.Notice);
+    }
+
+    [Fact]
+    public void 編輯器套用請求後自動套用()
+    {
+        var cursor = new FakeCursorService();
+        var vm = CreateVmWithStartup(new NoOpStartupService(), cursorService: cursor);
+        vm.AttachCursorEditorLauncher(editorVm =>
+        {
+            editorVm.SelectedSource = editorVm.Sources.First(s => s.Source.Id == "preset:Heart");
+            editorVm.ConfirmAndApplyCommand.Execute(null);
+            return true;
+        });
+
+        vm.EditCursorCommand.Execute(null);
+
+        Assert.Single(cursor.Applied); // 確認落地路徑（test writer）被套用
+        Assert.True(vm.Settings.CustomCursorEnabled);
     }
 
     private sealed class FakeCursorImportService : CursorImportService

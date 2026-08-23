@@ -18,6 +18,9 @@ public sealed class TrayIconService : IDisposable
     public event Action? PauseRequested;
     public event Action? MoveOnceRequested;
     public event Action? ExitRequested;
+    public event Action? EnableCursorRequested;
+    public event Action? DisableCursorRequested;
+    public event Action? RestoreCursorRequested;
 
     private readonly NotifyIcon _notifyIcon;
     private readonly ContextMenuStrip _menu;
@@ -37,9 +40,12 @@ public sealed class TrayIconService : IDisposable
         _pauseItem.Click += (_, _) => PauseRequested?.Invoke();
         var moveOnceItem = new ToolStripMenuItem("立即執行一次");
         moveOnceItem.Click += (_, _) => MoveOnceRequested?.Invoke();
-        var enableCursorItem = new ToolStripMenuItem("啟用自訂游標") { Enabled = false };   // Phase 9
-        var disableCursorItem = new ToolStripMenuItem("停用自訂游標") { Enabled = false };  // Phase 9
-        var restoreCursorItem = new ToolStripMenuItem("恢復 Windows 游標") { Enabled = false }; // Phase 9
+        var enableCursorItem = new ToolStripMenuItem("啟用自訂游標");
+        enableCursorItem.Click += (_, _) => EnableCursorRequested?.Invoke();
+        var disableCursorItem = new ToolStripMenuItem("停用自訂游標");
+        disableCursorItem.Click += (_, _) => DisableCursorRequested?.Invoke();
+        var restoreCursorItem = new ToolStripMenuItem("恢復 Windows 游標");
+        restoreCursorItem.Click += (_, _) => RestoreCursorRequested?.Invoke();
         var settingsItem = new ToolStripMenuItem("設定");
         settingsItem.Click += (_, _) => OpenRequested?.Invoke(); // 設定就在 Dashboard 上
         var exitItem = new ToolStripMenuItem("結束");
