@@ -75,4 +75,31 @@ public class AppSettingsTests
         s.Clamp();
         Assert.Equal(expected, s.CursorSize);
     }
+
+    [Fact]
+    public void Clamp夾制Hotspot於尺寸範圍()
+    {
+        var s = new AppSettings { CursorSize = 32, CursorHotspotX = 999, CursorHotspotY = -5 };
+        s.Clamp();
+        Assert.Equal(31, s.CursorHotspotX);
+        Assert.Equal(0, s.CursorHotspotY);
+    }
+
+    [Fact]
+    public void Clamp互斥時保留Preset()
+    {
+        var s = new AppSettings { CursorPreset = "Arrow", CursorFile = @"C:\x.png" };
+        s.Clamp();
+        Assert.Equal("Arrow", s.CursorPreset);
+        Assert.Equal("", s.CursorFile);
+    }
+
+    [Fact]
+    public void ConfirmedCursorFile預設空並於null時正規化()
+    {
+        Assert.Equal("", new AppSettings().ConfirmedCursorFile);
+        var s = new AppSettings { ConfirmedCursorFile = null! };
+        s.Clamp();
+        Assert.Equal("", s.ConfirmedCursorFile);
+    }
 }

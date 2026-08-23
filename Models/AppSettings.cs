@@ -33,6 +33,9 @@ public class AppSettings
     public string ToggleHotkey { get; set; } = "Ctrl+Alt+F9";
     public string RestoreCursorHotkey { get; set; } = "Ctrl+Alt+F10";
 
+    /// <summary>「確定」時落地的實際套用檔（processed .cur 或原 .cur/.ani 路徑）；Phase 9 套用一律讀此欄。</summary>
+    public string ConfirmedCursorFile { get; set; } = "";
+
     /// <summary>把所有數值夾制到規格允許範圍（載入與保存前呼叫）。</summary>
     public void Clamp()
     {
@@ -42,6 +45,7 @@ public class AppSettings
         ToggleHotkey ??= "Ctrl+Alt+F9";
         RestoreCursorHotkey ??= "Ctrl+Alt+F10";
         FavoriteCursors ??= new();
+        ConfirmedCursorFile ??= "";
 
         IdleStartSeconds = Math.Clamp(IdleStartSeconds, 5, 86400);
         MovementIntervalSeconds = Math.Clamp(MovementIntervalSeconds, 1, 86400);
@@ -49,6 +53,14 @@ public class AppSettings
         if (!AllowedCursorSizes.Contains(CursorSize))
         {
             CursorSize = 32;
+        }
+
+        // 移交 (h)：手改 settings.json 防護——hotspot 夾制於尺寸範圍；preset/file 互斥（preset 優先，與 RefreshCursorFileText 一致）
+        CursorHotspotX = Math.Clamp(CursorHotspotX, 0, CursorSize - 1);
+        CursorHotspotY = Math.Clamp(CursorHotspotY, 0, CursorSize - 1);
+        if (CursorPreset.Length > 0 && CursorFile.Length > 0)
+        {
+            CursorFile = "";
         }
     }
 }

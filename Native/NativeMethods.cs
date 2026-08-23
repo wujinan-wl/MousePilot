@@ -47,6 +47,10 @@ internal static class NativeMethods
     private const int SM_CXVIRTUALSCREEN = 78;
     private const int SM_CYVIRTUALSCREEN = 79;
 
+    internal const uint OCR_NORMAL = 32512;
+
+    private const uint SPI_SETCURSORS = 0x0057;
+
     [DllImport("user32.dll")]
     private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
 
@@ -71,6 +75,18 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", SetLastError = true)]
     internal static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    internal static extern IntPtr LoadCursorFromFile(string lpFileName);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern bool SetSystemCursor(IntPtr hcur, uint id);
+
+    [DllImport("user32.dll")]
+    internal static extern bool DestroyCursor(IntPtr hCursor);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, IntPtr pvParam, uint fWinIni);
 
     /// <summary>最後一次輸入的 tick（毫秒）。失敗時回傳目前 tick——視為「剛有輸入」的保守值，確保不誤觸發移動（規格 §40-1）。</summary>
     internal static uint GetLastInputTick()
@@ -113,4 +129,7 @@ internal static class NativeMethods
 
     /// <summary>精準設定游標位置（不產生輸入事件，僅供 ±1px 校正）。</summary>
     internal static bool SetCursorPosition(int x, int y) => SetCursorPos(x, y);
+
+    /// <summary>重載使用者的 Windows Cursor Scheme（恢復所有系統游標；Spike B 驗證）。</summary>
+    internal static bool ReloadCursorScheme() => SystemParametersInfo(SPI_SETCURSORS, 0, IntPtr.Zero, 0);
 }
