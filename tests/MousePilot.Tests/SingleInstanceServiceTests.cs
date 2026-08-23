@@ -11,6 +11,7 @@ public class SingleInstanceServiceTests
     {
         using var svc = new SingleInstanceService(UniqueName());
         Assert.True(svc.TryAcquire());
+        Assert.False(svc.AcquiredViaFailOpen);
     }
 
     [Fact]
@@ -95,6 +96,7 @@ public class SingleInstanceServiceTests
         using var svc = new SingleInstanceService(name);
 
         Assert.True(svc.TryAcquire()); // kernel object 例外 → fail-open：寧可多開也不可啟動即 crash（規格 §21）
+        Assert.True(svc.AcquiredViaFailOpen);
     }
 
     [Fact]

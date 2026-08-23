@@ -27,6 +27,7 @@ public sealed class TrayIconService : IDisposable
     private readonly ToolStripMenuItem _startItem;
     private readonly ToolStripMenuItem _pauseItem;
     private readonly Icon _icon;
+    private bool _disposed;
 
     public TrayIconService(bool visible = true)
     {
@@ -126,6 +127,13 @@ public sealed class TrayIconService : IDisposable
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
         _notifyIcon.Visible = false; // 先隱藏避免系統匣殘影
         _notifyIcon.Dispose();
         _menu.Dispose();

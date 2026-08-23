@@ -16,6 +16,10 @@ public sealed class SingleInstanceService : IDisposable
     private Thread? _ownerThread;
     private bool _owned;
 
+    /// <summary>true = 本次 TryAcquire 是透過 fail-open 路徑取得（kernel object 名稱被占用/ACL 拒絕）——
+    /// 本實例已失去單一實例保證，呼叫端應記錄以利事後排查（review Finding 1）。</summary>
+    public bool AcquiredViaFailOpen { get; private set; }
+
     public SingleInstanceService(string? name = null)
     {
         _baseName = name ?? "MousePilot-SingleInstance";
@@ -73,6 +77,7 @@ public sealed class SingleInstanceService : IDisposable
             {
                 // kernel object 名稱被其他型別占用/ACL 拒絕：fail-open——寧可失去單一實例保證也不可啟動即 crash（規格 §21）
                 acquired = true;
+                AcquiredViaFailOpen = true; // 寫入發生於 acquiredSignal.Set() 之前——比照 acquired 的 happens-before 模式
                 acquiredSignal.Set();
                 _releaseSignal.Wait();
             }

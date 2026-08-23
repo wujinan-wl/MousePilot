@@ -409,6 +409,18 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     [Fact]
+    public void Registry錯誤寫入log()
+    {
+        var dir = Path.Combine(_dir, "logs");
+        var log = new LogService(dir, clock: () => DateTime.Now);
+        var vm = CreateVmWithStartup(new FailingStartupService(), logService: log);
+
+        vm.RunAtStartup = true; // Enable 失敗 → Notice + log（§29 Registry 錯誤）
+
+        Assert.Contains("[ERROR]", File.ReadAllText(Path.Combine(dir, "mousepilot.log")));
+    }
+
+    [Fact]
     public void 啟動時同步Registry實際狀態並修復路徑()
     {
         try
@@ -541,6 +553,20 @@ public sealed class MainViewModelTests : IDisposable
         Assert.Equal(MonitorStatus.Paused, vm.Status);
         Assert.Equal("已暫停", vm.StatusText);
         Assert.True(vm.StartCommand.CanExecute(null)); // UI 可重啟（review 修正）
+    }
+
+    [Fact]
+    public void 錯誤狀態後續失敗不重複記錄()
+    {
+        var dir = Path.Combine(_dir, "logs");
+        var log = new LogService(dir, clock: () => DateTime.Now);
+        var vm = CreateVmWithFailingMove(log);
+        vm.StartCommand.Execute(null);
+
+        for (var i = 0; i < 6; i++) { vm.MoveOnceCommand.Execute(null); }
+
+        var errorLines = File.ReadAllLines(Path.Combine(dir, "mousepilot.log")).Count(l => l.Contains("[ERROR]"));
+        Assert.Equal(4, errorLines); // 3 次失敗 + 1 次進入錯誤狀態；第 4~6 次靜默（review 修正）
     }
 
     [Fact]

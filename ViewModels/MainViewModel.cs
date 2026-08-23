@@ -104,6 +104,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 if (!_startupService.Enable())
                 {
                     Notice = "開機自動啟動路徑修復失敗，請重新勾選一次。";
+                    _log?.Error(Notice);
                 }
             }
         }
@@ -183,10 +184,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     break;
                 case MoveResult.Win32Failure:
                     _consecutiveMoveFailures++;
-                    _log?.Error($"滑鼠移動失敗（Win32 呼叫失敗，連續 {_consecutiveMoveFailures} 次）");
-                    if (_consecutiveMoveFailures >= 3)
+                    if (!_errorLatched)
                     {
-                        _errorLatched = true;
+                        _log?.Error($"滑鼠移動失敗（Win32 呼叫失敗，連續 {_consecutiveMoveFailures} 次）");
+                        if (_consecutiveMoveFailures >= 3)
+                        {
+                            _errorLatched = true;
+                            _log?.Error("連續失敗達 3 次，進入錯誤狀態（後續失敗靜默記錄至恢復為止）");
+                        }
                     }
 
                     break;
@@ -256,6 +261,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 Notice = value
                     ? "無法寫入開機自動啟動設定。"
                     : "無法移除開機自動啟動設定。";
+                _log?.Error(Notice);
             }
 
             OnPropertyChanged(); // 失敗時 getter 仍回舊值 → checkbox 還原

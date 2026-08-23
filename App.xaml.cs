@@ -43,6 +43,11 @@ public partial class App : Application
 
         _logService = new LogService(); // mutex 取得之後才建——第二實例不記 log
 
+        if (_singleInstance.AcquiredViaFailOpen)
+        {
+            _logService.Error("單一實例 mutex 建立失敗（kernel object 名稱被占用或拒絕），以 fail-open 模式啟動——本次執行失去單一實例保證");
+        }
+
         DispatcherUnhandledException += (_, args) => EmergencyShutdown("Dispatcher", args.Exception);
         AppDomain.CurrentDomain.UnhandledException += (_, args) => EmergencyShutdown("AppDomain", args.ExceptionObject as Exception);
         SessionEnding += (_, _) =>
@@ -156,7 +161,8 @@ public partial class App : Application
     }
 
     /// <summary>未處理例外的最後防線（移交 b/e/g）：每步各自 try/catch 到底；不吞例外——清理後讓程序終止。
-    /// 移交 (g)：HotkeyService WndProc 例外沿 Dispatcher 傳播，<see cref="Application.DispatcherUnhandledException"/> 已涵蓋。</summary>
+    /// 移交 (g)：HotkeyService WndProc 例外沿 Dispatcher 傳播，<see cref="Application.DispatcherUnhandledException"/> 已涵蓋。
+    /// 順序刻意異於 §30（先存設定後清 tray）：緊急路徑優先保全持久狀態，tray 清理屬外觀性。</summary>
     private void EmergencyShutdown(string source, Exception? ex)
     {
         try { _logService?.Error($"未處理例外（{source}）", ex); } catch { /* 最後防線內不得再拋——專案唯一允許的裸 catch */ }
