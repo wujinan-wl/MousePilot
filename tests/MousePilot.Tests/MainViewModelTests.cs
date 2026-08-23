@@ -750,6 +750,21 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     [Fact]
+    public void 移除圖片後套用按鈕停用()
+    {
+        var cursor = new FakeCursorImportService();
+        var vm = CreateVmWithCursor(cursor, @"C:\pics\cat.png");
+        vm.ImportCursorCommand.Execute(null);
+        vm.Settings.ConfirmedCursorFile = @"C:\appdata\confirmed-cursor.cur";
+        Assert.True(vm.ApplyCursorCommand.CanExecute(null));
+
+        vm.RemoveCursorCommand.Execute(null);
+
+        Assert.Equal("", vm.Settings.ConfirmedCursorFile); // 移除後回到「未確認」（final review 修正）
+        Assert.False(vm.ApplyCursorCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void 取消選檔不做任何事()
     {
         var cursor = new FakeCursorImportService();

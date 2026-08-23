@@ -273,9 +273,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         Settings.CursorFile = "";
+        Settings.ConfirmedCursorFile = ""; // 移除後回到「未確認」——否則仍可套用已移除的游標（final review 修正）
         _lastImportSize = (null, null);
         RefreshCursorFileText();
         RemoveCursorCommand.NotifyCanExecuteChanged();
+        ApplyCursorCommand.NotifyCanExecuteChanged();
     }
 
     private bool CanRemoveCursor() => Settings.CursorFile.Length > 0;
