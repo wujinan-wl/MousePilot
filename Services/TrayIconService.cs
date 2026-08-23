@@ -81,6 +81,17 @@ public sealed class TrayIconService : IDisposable
         _notifyIcon.Text = text.Length <= 63 ? text : text[..63];
     }
 
+    /// <summary>tray-only 狀態下的通知可見性（P6 移交 b）：3 秒氣泡提示；空字串忽略。</summary>
+    public void ShowInfo(string text)
+    {
+        if (text.Length == 0)
+        {
+            return;
+        }
+
+        _notifyIcon.ShowBalloonTip(3000, "MousePilot", text, ToolTipIcon.Info);
+    }
+
     public ToolStripMenuItem? FindMenuItem(string text)
         => _menu.Items.OfType<ToolStripMenuItem>().FirstOrDefault(i => i.Text == text);
 

@@ -23,7 +23,7 @@ public class TrayIconServiceTests
     }
 
     [Fact]
-    public void 游標三項於Phase9前停用()
+    public void 游標三項已啟用()
     {
         using var tray = Create();
         Assert.True(tray.FindMenuItem("啟用自訂游標")!.Enabled);

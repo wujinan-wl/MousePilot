@@ -767,6 +767,34 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     [Fact]
+    public void 系統恢復通知只刷狀態不動設定()
+    {
+        var cursor = new FakeCursorService();
+        var vm = CreateVmWithStartup(new NoOpStartupService(), cursorService: cursor);
+        vm.Settings.ConfirmedCursorFile = @"C:\a.cur";
+        vm.ApplyCursorCommand.Execute(null);
+
+        cursor.Restore();            // 模擬 SessionEnding 直接恢復（不經 VM）
+        vm.NotifySystemRestored();
+
+        Assert.Equal("Windows 預設", vm.CursorStatusText);
+        Assert.True(vm.Settings.CustomCursorEnabled); // 不動 enabled——下次登入自動套回（移交 i）
+    }
+
+    [Fact]
+    public void 套用失敗清除啟用旗標()
+    {
+        var cursor = new FakeCursorService { ApplyResult = false };
+        var vm = CreateVmWithStartup(new NoOpStartupService(), cursorService: cursor);
+        vm.Settings.ConfirmedCursorFile = @"C:\gone.cur";
+        vm.Settings.CustomCursorEnabled = true; // 模擬啟動 auto-apply 情境
+
+        vm.ApplyCursorCommand.Execute(null);
+
+        Assert.False(vm.Settings.CustomCursorEnabled); // 失敗不得留 true——否則每次啟動重試（backlog k）
+    }
+
+    [Fact]
     public void 恢復游標更新狀態與設定()
     {
         var cursor = new FakeCursorService();

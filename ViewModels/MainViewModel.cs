@@ -360,10 +360,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
             SaveSettings();
             RefreshCursorStatusText();
             Notice = "已套用自訂游標。";
+            _log?.Info("已套用自訂游標。");
         }
         else
         {
+            Settings.CustomCursorEnabled = false; // 失敗不得留 true——否則下次啟動 auto-apply 每次重試（backlog k）
+            SaveSettings();
             Notice = "套用游標失敗（檔案可能已損毀或被移除）。";
+            _log?.Error(Notice);
         }
     }
 
@@ -378,12 +382,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
             SaveSettings();
             RefreshCursorStatusText();
             Notice = "已恢復 Windows 游標。";
+            _log?.Info("已恢復 Windows 游標。");
         }
         else
         {
             Notice = "恢復游標失敗，將於下次啟動自動補救。";
+            _log?.Error(Notice);
         }
     }
+
+    /// <summary>系統事件（如 SessionEnding）已直接恢復游標時呼叫：只刷新顯示狀態，
+    /// 不動 <see cref="Models.AppSettings.CustomCursorEnabled"/>——下次登入沿用原設定自動套回（移交 i）。</summary>
+    public void NotifySystemRestored() => RefreshCursorStatusText();
 
     private void RefreshCursorStatusText()
         => CursorStatusText = _cursorService.IsApplied ? "已套用自訂游標" : "Windows 預設";
@@ -547,8 +557,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
-            // 保存失敗不可讓程式 crash（規格 §21）；Phase 11 接上 LogService 後記錄
+            // 保存失敗不可讓程式 crash（規格 §21）
             Notice = $"設定保存失敗：{ex.Message}";
+            _log?.Error("設定保存失敗", ex);
         }
     }
 

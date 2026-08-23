@@ -12,6 +12,7 @@ public partial class App : Application
     private TrayIconService? _tray;
     private CursorService? _cursorService;
     private SingleInstanceService? _singleInstance;
+    private LogService? _logService;
     private bool _exiting;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -40,12 +41,18 @@ public partial class App : Application
             _cursorService.Restore(); // 上次未正常恢復（crash）——先補救再繼續啟動
         }
 
-        // 未處理例外最小 hook（Phase 11 才有完整 handler）：只恢復游標，不吞例外
-        DispatcherUnhandledException += (_, _) => _cursorService?.Restore();
-        AppDomain.CurrentDomain.UnhandledException += (_, _) => _cursorService?.Restore();
-        SessionEnding += (_, _) => _cursorService?.Restore(); // Windows 登出/關機
+        _logService = new LogService(); // mutex 取得之後才建——第二實例不記 log
 
-        var vm = new MainViewModel(new SettingsService(), cursorService: _cursorService); // 區域變數供 lambda 捕捉（避免 nullable 欄位的 CS8602 警告）
+        DispatcherUnhandledException += (_, args) => EmergencyShutdown("Dispatcher", args.Exception);
+        AppDomain.CurrentDomain.UnhandledException += (_, args) => EmergencyShutdown("AppDomain", args.ExceptionObject as Exception);
+        SessionEnding += (_, _) =>
+        {
+            _logService?.Info("Session 結束（登出/關機）——恢復游標");
+            _cursorService?.Restore();
+            _mainViewModel?.NotifySystemRestored();
+        };
+
+        var vm = new MainViewModel(new SettingsService(), cursorService: _cursorService, logService: _logService); // 區域變數供 lambda 捕捉（避免 nullable 欄位的 CS8602 警告）
         _mainViewModel = vm;
         var window = new MainWindow { DataContext = vm };
         MainWindow = window;
@@ -76,6 +83,8 @@ public partial class App : Application
             window.Show();
         }
         // StartMinimized=true（規格 §16 預設）：不顯示視窗，僅系統匣
+
+        _logService.Info("程式啟動");
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -84,6 +93,13 @@ public partial class App : Application
             && _mainViewModel is not null)
         {
             _tray?.UpdateStatus(_mainViewModel.Status, _mainViewModel.StatusText);
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.Notice)
+            && _mainViewModel is { } vmn && vmn.Notice.Length > 0
+            && MainWindow?.IsVisible != true)
+        {
+            _tray?.ShowInfo(vmn.Notice); // tray-only 狀態下的通知可見性（P6 移交 b）
         }
     }
 
@@ -135,7 +151,18 @@ public partial class App : Application
         _tray?.Dispose();               // 6：系統匣圖示
         _mainViewModel?.SaveSettings(); // 7：保存設定
         _singleInstance?.Dispose();     // 8：釋放 Mutex
+        _logService?.Info("程式結束");
         Shutdown();                     // 9：關閉程式
+    }
+
+    /// <summary>未處理例外的最後防線（移交 b/e/g）：每步各自 try/catch 到底；不吞例外——清理後讓程序終止。
+    /// 移交 (g)：HotkeyService WndProc 例外沿 Dispatcher 傳播，<see cref="Application.DispatcherUnhandledException"/> 已涵蓋。</summary>
+    private void EmergencyShutdown(string source, Exception? ex)
+    {
+        try { _logService?.Error($"未處理例外（{source}）", ex); } catch { /* 最後防線內不得再拋——專案唯一允許的裸 catch */ }
+        try { _cursorService?.Restore(); } catch { }
+        try { _mainViewModel?.SaveSettings(); } catch { }
+        try { _tray?.Dispose(); } catch { }
     }
 
     protected override void OnExit(ExitEventArgs e)
