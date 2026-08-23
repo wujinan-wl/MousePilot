@@ -24,7 +24,7 @@ public sealed class SingleInstanceService : IDisposable
     public event Action? WakeRequested;
 
     /// <summary>
-    /// true = 本程序為第一實例（取得所有權並開始監聽喚醒訊號）。
+    /// true = 本程序為第一實例（取得所有權；喚醒監聽由訂閱 WakeRequested 後呼叫 StartListening 啟動）。
     /// 注意：Win32 named Mutex 的擁有權以「執行緒」為單位（同執行緒對同一 named mutex 可重入取得，
     /// 即使透過不同的 Mutex handle）。因此判定與持有動作固定綁在專屬背景執行緒上執行，
     /// 該執行緒直到 Dispose() 才釋放 mutex 並結束——避免呼叫端執行緒重入造成誤判「已取得」。
