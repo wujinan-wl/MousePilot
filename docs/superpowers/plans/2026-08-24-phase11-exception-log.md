@@ -370,7 +370,7 @@ public class LogService
 - Test: `tests/MousePilot.Tests/MouseMovementServiceTests.cs`（回傳值斷言同步改）、`tests/MousePilot.Tests/MainViewModelTests.cs`（+4）
 
 **Interfaces:**
-- Produces: `enum MoveResult { Success, Cancelled, ConservativeAbort, Win32Failure }`（Models/ 或 Services/ 依 MouseMovementService 檔內慣例）；`MouseMovementService.ExecuteMoveAsync : Task<MoveResult>`——對應：ct 取消→`Cancelled`；游標讀取失敗/起點出界/雙重檢查放棄→`ConservativeAbort`；`sendMove`/`correctPosition` 回 false→`Win32Failure`；其餘→`Success`。`MainViewModel` 第 11 參數 `LogService? logService = null`；`MonitorStatus.Error`；連續 `Win32Failure` ≥3 → Status latch `Error`（`StatusText` = 「錯誤（滑鼠移動失敗）」），下次 `Success` 或 `StartCommand` 解除；`_moving` 防重入丟棄記 Info；`WasCorrupt` 記 Error（設定載入錯誤）。
+- Produces: `enum MoveResult { Success, Cancelled, ConservativeAbort, Win32Failure }`（Models/ 或 Services/ 依 MouseMovementService 檔內慣例）；`MouseMovementService.ExecuteMoveAsync : Task<MoveResult>`——對應：ct 取消→`Cancelled`；游標讀取失敗/起點出界/雙重檢查放棄→`ConservativeAbort`；`sendMove`/`correctPosition` 回 false→`Win32Failure`；其餘→`Success`。`MainViewModel` 第 11 參數 `LogService? logService = null`；`MonitorStatus.Error`；連續 `Win32Failure` ≥3 → Status latch `Error`（`StatusText` = 「錯誤（滑鼠移動失敗）」），下次 `Success`、`StartCommand` 或 **`PauseCommand`**（暫停即解除——否則 Status 永遠 Error、CanStart 永久 false 卡死 UI；review 修正）解除；`_moving` 防重入丟棄記 Info；`WasCorrupt` 記 Error（設定載入錯誤）。
 
 - [ ] **Step 1: 寫失敗測試**
 
