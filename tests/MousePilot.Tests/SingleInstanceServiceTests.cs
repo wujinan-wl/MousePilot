@@ -32,10 +32,28 @@ public class SingleInstanceServiceTests
         Assert.True(first.TryAcquire());
         using var woken = new ManualResetEventSlim(false);
         first.WakeRequested += woken.Set;
+        first.StartListening();
 
         second.SignalFirstInstance();
 
         Assert.True(woken.Wait(TimeSpan.FromSeconds(5)), "5 秒內未收到喚醒訊號");
+    }
+
+    [Fact]
+    public void 監聽前的喚醒訊號不丟失()
+    {
+        var name = UniqueName();
+        using var first = new SingleInstanceService(name);
+        using var second = new SingleInstanceService(name);
+        Assert.True(first.TryAcquire());
+
+        second.SignalFirstInstance(); // 尚未 StartListening——AutoReset event latch 住
+
+        using var woken = new ManualResetEventSlim(false);
+        first.WakeRequested += woken.Set;
+        first.StartListening();
+
+        Assert.True(woken.Wait(TimeSpan.FromSeconds(5)), "latch 的喚醒訊號未於註冊時補觸發");
     }
 
     [Fact]

@@ -63,7 +63,8 @@ public partial class App : Application
         vm.PropertyChanged += OnViewModelPropertyChanged;
         _tray.UpdateStatus(vm.Status, vm.StatusText);
 
-        _singleInstance.WakeRequested += () => Dispatcher.Invoke(ShowDashboard); // threadpool → UI thread
+        _singleInstance.WakeRequested += () => Dispatcher.BeginInvoke(ShowDashboard); // BeginInvoke：dispatcher 關閉時靜默 abort，不丟例外（review 修正）
+        _singleInstance.StartListening(); // 訂閱後才開始監聽——關閉啟動期喚醒丟失窗（review 修正）
 
         if (vm.Settings.CustomCursorEnabled && vm.ApplyCursorCommand.CanExecute(null))
         {

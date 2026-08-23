@@ -70,13 +70,22 @@ public sealed class SingleInstanceService : IDisposable
 
         _owned = acquired;
 
-        if (_owned)
+        return _owned;
+    }
+
+    /// <summary>
+    /// 訂閱 WakeRequested 之後呼叫：開始監聽喚醒訊號。
+    /// AutoReset event 具 latch 語意——呼叫前抵達的 Signal 會在註冊瞬間補觸發，訂閱後才監聽即可完全關閉喚醒丟失窗。
+    /// </summary>
+    public void StartListening()
+    {
+        if (!_owned || _waitRegistration is not null)
         {
-            _waitRegistration = ThreadPool.RegisterWaitForSingleObject(
-                _wakeEvent, (_, _) => WakeRequested?.Invoke(), null, Timeout.Infinite, executeOnlyOnce: false);
+            return;
         }
 
-        return _owned;
+        _waitRegistration = ThreadPool.RegisterWaitForSingleObject(
+            _wakeEvent, (_, _) => WakeRequested?.Invoke(), null, Timeout.Infinite, executeOnlyOnce: false);
     }
 
     /// <summary>第二實例呼叫：通知第一實例開啟 Dashboard。</summary>
