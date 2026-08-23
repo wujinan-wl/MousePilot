@@ -23,3 +23,4 @@
 - 游標編輯器（Phase 8）：預設圖案 Grid（16 內建 + 匯入檔案）與我的收藏、尺寸選擇、點擊設 Hotspot（十字標記/座標格/手動輸入）、JPG 去背（左上角參考色 + 容差）、雙背景模擬預覽（面板局部游標，不動全域）；移除失敗防孤兒檔案。
 - 全域游標套用/恢復（Phase 9）：SetSystemCursor 套用（僅標準箭頭）＋ SPI_SETCURSORS 恢復；恢復掛所有退出路徑（按鈕/F10/Tray/關閉/未處理例外/登出/crash 後啟動補救/--restore-cursor 參數）；「確定」落地 confirmed 游標檔（WYSIWYG）；Tray 游標選單項與主視窗 套用/恢復 按鈕啟用。
 - 單一實例（Phase 10）：named Mutex 阻止多開；第二次啟動自動喚醒原實例開啟 Dashboard（Tray 隱藏狀態亦可）；crash 後 abandoned mutex 自動接手；結束流程補上釋放 Mutex（§30 步驟 8）。
+- 例外處理與 Log（Phase 11）：LogService（5MB 輪替、保留 3 份歸檔、失敗靜默）；未處理例外統一 EmergencyShutdown（記 log→恢復游標→存設定→清 Tray，不吞例外）；滑鼠移動連續失敗紅色錯誤狀態；快捷鍵錯誤碼區分與等價組合查重；數值夾制後 UI 即時刷新；tray-only 狀態通知改 balloon 顯示；marker write-ahead 與單一實例 fail-open 強化。

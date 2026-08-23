@@ -29,7 +29,7 @@
 | 8 | Hotspot Editor + Preview | ✅ 完成 | `2026-08-23-phase8-hotspot-editor.md` |
 | 9 | Global Cursor 套用/恢復 | ✅ 完成 | `2026-08-23-phase9-global-cursor.md` |
 | 10 | Single Instance | ✅ 完成 | `2026-08-24-phase10-single-instance.md` |
-| 11 | Exception Handling / Log | ⬜ 未開始 | 〃 |
+| 11 | Exception Handling / Log | ✅ 完成 | `2026-08-24-phase11-exception-log.md` |
 | 12 | Publish Single EXE + 文件交付 | ⬜ 未開始 | 〃 |
 
 狀態：⬜ 未開始 / 🟡 進行中 / ✅ 完成 / ⛔ 阻塞
@@ -142,12 +142,18 @@
 - **測試項目：** 規格 §34 案例 31；rotate 單元測試。
 - **風險：** 例外 handler 內再拋例外——handler 必須自身 try/catch 到底。
 - **移交事項（Phase 2 ledger）：** (a) `MonitorStatus` 需擴充 `Error` 值 + XAML 紅色狀態點（規格 §28）；(b) 全域 handler 必須涵蓋 Dispatcher 例外（DispatcherTimer 事件路徑目前無防護）。
+  - ✅ 已清償（Phase 11）：(a) `MonitorStatus.Error` 與紅色狀態點已實作；(b) Dispatcher 例外已統一經 `EmergencyShutdown` 處理。
 - **移交事項（Phase 3 ledger）：** (c) `MouseMovementService.ExecuteMoveAsync` 回傳 bare bool，無法區分「取消/Win32 失敗/保守放棄」——接 log 時需改 reason enum 或注入 log callback（簽章變更要規劃，不要現場發現）；(d) VM `_moving` 防重入的靜默丟棄應記 log。
+  - ✅ 已清償（Phase 11）：(c) 已改為 `MoveResult` enum 取代 bare bool；(d) `_moving` 防重入已改為記 log 而非靜默丟棄。
 - **移交事項（Phase 6 final review）：** (f) 「StartMonitoring 的 Clamp 改值後 UI 不刷新」（數值 TextBox 直綁非 INPC 的 Settings.*，Clamp 後畫面殘留舊值）——INPC 化或 VM 數值包裝屬性，本階段回頭整理錯誤呈現時一併解；(g) HotkeyService WndProc 的 handler 例外需納入 Dispatcher 全域 handler 涵蓋範圍；(h) RegisterHotKey 失敗訊息一律「被占用」——可用 Marshal.GetLastWin32Error 區分 1409 與其他錯誤，且查重應比較 Parse 結果而非字串（手改 settings 修飾鍵順序不同時的誤報）。
+  - ✅ 已清償（Phase 11）：(f) 三個 VM 數值包裝屬性已導入，Clamp 後 UI 即時刷新；(g) WndProc 例外經 Dispatcher 已由 `EmergencyShutdown` 涵蓋（xml-doc 已註記此路徑）；(h) RegisterHotKey 失敗已依 `Marshal.GetLastWin32Error` 分流 1409 與其他錯誤，查重改為比較 Parse 後的值等式。
 - **移交事項（Phase 4 final review）：** (e) 未處理例外 crash 會跳過 OnExit → ghost tray icon + 設定未保存；預設 tray-only 模式下例外風險升高——全域 handler 必須包含 Tray.Dispose 與 SaveSettings（連同既有的恢復游標要求）。
+  - ✅ 已清償（Phase 11）：(e) 全域 handler（`EmergencyShutdown`）已含 SaveSettings 與 Tray.Dispose。
 - **移交事項（Phase 9 final review）：** (i) 完整 handler 實作時把 App 的三個 restore hook（Dispatcher/AppDomain/SessionEnding）收斂為單一 `EmergencyRestore()`——含 VM 狀態刷新（修「取消登出後 UI 仍顯示已套用」的不同步）；(j) `CursorService` marker 改 write-ahead（SetSystemCursor 前寫入）——零成本封死「替換成功後、marker 寫入前被強殺」的微秒縫隙；(k) backlog（不急）：啟動 auto-apply 失敗時考慮清 `CustomCursorEnabled`（否則每次啟動重試+tray-only 下 Notice 不可見）；Tray「啟用自訂游標」未確認時點擊無回饋；`TrayIconServiceTests` 過時測試名 `游標三項於Phase9前停用` 改名。
+  - ✅ 已清償（Phase 11）：(i) 三個 restore hook 已收斂為 `EmergencyShutdown`，SessionEnding 另補 `NotifySystemRestored` 刷新 VM 狀態；(j) `CursorService` marker 已改為 write-ahead（SetSystemCursor 前寫入）；(k) backlog 三件已一併清償——啟動 auto-apply 失敗會清 `CustomCursorEnabled`、tray-only 狀態通知已改 balloon 顯示、`TrayIconServiceTests` 過時測試名已改名。
 
 - **移交事項（Phase 10 final review）：** (l) `SingleInstanceService` 強化四件（併入例外處理任務）：kernel object 建立例外（`WaitHandleCannotBeOpenedException`/ACL 拒絕，發生在背景持有緒會直接殺程序）→ catch 後 fail-open（視為取得照常啟動）+ log；`ReleaseMutex` 的 catch 註解改「防禦性——重設計後理論上不會發生」；`Unregister(null)` 改 `Unregister(_wakeEvent)` 教科書收尾模式；`TryAcquire` 加重複呼叫守衛（`if (_ownerThread is not null) throw`——重複呼叫會令第一持有緒永卡）。(m) **時序不變式（完整 handler 實作時必須維持）：exception hooks 掛載必須在 mutex 取得之後**——第二實例掛了 hooks 反而會在自身出例外時清掉第一實例的游標。
+  - ✅ 已清償（Phase 11）：(l) `SingleInstanceService` 四件強化（fail-open + log、防禦性註解、`Unregister(_wakeEvent)`、`TryAcquire` 重複呼叫守衛）已全數完成；(m) 時序不變式（exception hooks 掛載於 mutex 取得之後）已維持並經 review 驗證。
 
 ## Phase 12：Publish + 文件交付
 
