@@ -447,7 +447,7 @@ public sealed class MainViewModelTests : IDisposable
                 randomIndexProvider: () => 0),
             startup,
             hotkey ?? new HotkeyHarness().Service,
-            cursorService: cursorService,
+            cursorService: cursorService ?? new FakeCursorService(), // 預設 fake：任何經 helper 的測試絕不觸真實 Win32 游標 API
             confirmedCurWriter: confirmedCurWriter ?? (_ => Path.Combine(_dir, "confirmed-cursor.cur")));
     }
 
@@ -717,6 +717,7 @@ public sealed class MainViewModelTests : IDisposable
             new HotkeyHarness().Service,
             cursor,
             () => pickedFile,
+            cursorService: new FakeCursorService(), // 預設 fake：絕不觸真實 Win32 游標 API
             confirmedCurWriter: _ => Path.Combine(_dir, "confirmed-cursor.cur"));
     }
 
