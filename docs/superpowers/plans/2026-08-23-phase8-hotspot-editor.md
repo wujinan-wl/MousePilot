@@ -267,6 +267,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
 
 ```csharp
 using System.Drawing;
+using System.IO;   // 測試專案 implicit usings 不含 System.IO
 using MousePilot.Models;
 using MousePilot.Services;
 using MousePilot.ViewModels;
@@ -607,12 +608,14 @@ public partial class CursorSourceItem : ObservableObject
 /// 游標編輯器（規格 §9/§10/補三~補八）。全邏輯可測：影像來源、WPF Cursor 建立、檔案列舉皆注入。
 /// 管線順序固定：去背（左上角參考色）→ 裁切 → 縮放 → Write（Phase 7 移交約束）。預覽絕不動全域游標。
 /// </summary>
-public partial class CursorEditorViewModel : ObservableObject
+public partial class CursorEditorViewModel : ObservableObject, IDisposable
 {
     private readonly AppSettings _settings;
     private readonly Func<string, Bitmap?> _imageLoader;
     private readonly Func<byte[], System.Windows.Input.Cursor?> _cursorFactory;
     private bool _applyingDefaults;
+    private Bitmap? _loadedSource;   // 原圖快取：同來源反覆 Rebuild 不重複解碼、防 GDI handle 洩漏（review 修正）
+    private string? _loadedSourcePath;
 
     public event Action? CloseRequested;
 
@@ -835,9 +838,29 @@ public partial class CursorEditorViewModel : ObservableObject
         }
     }
 
+    /// <summary>按路徑快取 loader 載入的原圖：同一來源反覆 Rebuild 不重複解碼；換來源時釋放舊圖（review 修正）。</summary>
+    private Bitmap? LoadSourceCached(string path)
+    {
+        if (_loadedSourcePath != path || _loadedSource is null)
+        {
+            _loadedSource?.Dispose();
+            _loadedSource = _imageLoader(path);
+            _loadedSourcePath = path;
+        }
+
+        return _loadedSource;
+    }
+
+    public void Dispose()
+    {
+        _loadedSource?.Dispose();
+        _loadedSource = null;
+    }
+
     private void RebuildFromImageFile(string path)
     {
-        using var source = _imageLoader(path);
+        // 不 Dispose：來源由 _loadedSource 快取持有所有權，換來源或 VM Dispose 時才釋放。
+        var source = LoadSourceCached(path);
         if (source is null)
         {
             Warning = "圖片載入失敗（檔案可能已被移除或損毀）。";
@@ -857,19 +880,32 @@ public partial class CursorEditorViewModel : ObservableObject
             }
 
             using var trimmed = CursorImageProcessor.TrimTransparent(working);
-            if (trimmed.Width == 1 && trimmed.Height == 1 && (source.Width > 1 || source.Height > 1))
+            // TrimTransparent 對「全透明」與「僅剩一個實心像素」都會收斂成 1x1，需再檢查該像素是否透明才能分辨（review 修正）。
+            if (trimmed.Width == 1 && trimmed.Height == 1 && (source.Width > 1 || source.Height > 1) && trimmed.GetPixel(0, 0).A == 0)
             {
                 Warning = "去背後沒有可見內容——請降低容差或關閉去背。"; // 退化防護（Phase 7 移交 (d) 前半）
                 return;
             }
 
-            using var scaled = CursorImageProcessor.ScaleProportional(trimmed, SelectedSize);
+            // 1x1 內容直接實心填滿：GDI+ HighQualityBicubic 對 1x1 來源放大時無法達到完全不透明（實測 alpha 上限約 190/255），
+            // ScaleProportional 本身即有此限制，故此處繞過內插改直接填色（review 修正）。
+            using var scaled = trimmed.Width == 1 && trimmed.Height == 1
+                ? FillSolid(trimmed.GetPixel(0, 0), SelectedSize)
+                : CursorImageProcessor.ScaleProportional(trimmed, SelectedSize);
             FinishBuild(scaled);
         }
         finally
         {
             removed?.Dispose();
         }
+    }
+
+    private static Bitmap FillSolid(System.Drawing.Color color, int size)
+    {
+        var bmp = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using var g = Graphics.FromImage(bmp);
+        g.Clear(color);
+        return bmp;
     }
 
     private void RebuildFromCursorFile(string path)
@@ -1154,6 +1190,7 @@ public partial class CursorEditorWindow : Window
     {
         InitializeComponent();
         DataContext = viewModel;
+        Closed += (_, _) => viewModel.Dispose(); // 釋放 VM 快取的原圖 Bitmap
         viewModel.CloseRequested += () =>
         {
             DialogResult = true;
