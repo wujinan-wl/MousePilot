@@ -11,6 +11,7 @@ public partial class App : Application
     private MainViewModel? _mainViewModel;
     private TrayIconService? _tray;
     private CursorService? _cursorService;
+    private SingleInstanceService? _singleInstance;
     private bool _exiting;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -24,6 +25,14 @@ public partial class App : Application
             _cursorService.Restore(); // 緊急補救參數（Spike B --restore-only 語意）：恢復後直接結束
             Shutdown();
             return;
+        }
+
+        _singleInstance = new SingleInstanceService();
+        if (!_singleInstance.TryAcquire())
+        {
+            _singleInstance.SignalFirstInstance(); // 通知原實例開啟 Dashboard（規格 §20）
+            Shutdown();
+            return; // 第二實例：零副作用讓路（不補救 marker、不掛 hooks、不建 VM）
         }
 
         if (_cursorService.HasPendingRestore)
@@ -53,6 +62,8 @@ public partial class App : Application
         _tray.RestoreCursorRequested += () => vm.RestoreCursorCommand.Execute(null);
         vm.PropertyChanged += OnViewModelPropertyChanged;
         _tray.UpdateStatus(vm.Status, vm.StatusText);
+
+        _singleInstance.WakeRequested += () => Dispatcher.Invoke(ShowDashboard); // threadpool → UI thread
 
         if (vm.Settings.CustomCursorEnabled && vm.ApplyCursorCommand.CanExecute(null))
         {
@@ -122,6 +133,7 @@ public partial class App : Application
         _cursorService?.Dispose();      // 5：恢復游標（已套用才動作）
         _tray?.Dispose();               // 6：系統匣圖示
         _mainViewModel?.SaveSettings(); // 7：保存設定
+        _singleInstance?.Dispose();     // 8：釋放 Mutex
         Shutdown();                     // 9：關閉程式
     }
 
@@ -134,6 +146,7 @@ public partial class App : Application
             _mainViewModel?.Dispose();
             _tray?.Dispose();
             _cursorService?.Dispose();
+            _singleInstance?.Dispose();
         }
 
         base.OnExit(e);
