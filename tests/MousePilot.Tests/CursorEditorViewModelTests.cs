@@ -245,4 +245,31 @@ public sealed class CursorEditorViewModelTests : IDisposable
     {
         Assert.False(Create().ConfirmCommand.CanExecute(null));
     }
+
+    [Fact]
+    public void 手動輸入Hotspot直接夾制()
+    {
+        var vm = Create();
+        vm.SelectedSource = vm.Sources.First(s => s.Source.Id == "preset:Dot");
+
+        vm.HotspotX = 999;  // 模擬 TextBox 綁定直接設值
+        vm.HotspotY = -3;
+
+        Assert.Equal((31, 0), (vm.HotspotX, vm.HotspotY));
+        var read = CurFileFormat.TryReadFirstImage(vm.CurrentCurBytes!);
+        Assert.Equal((31, 0), (read!.Value.Info.HotspotX, read.Value.Info.HotspotY));
+        read.Value.Image.Dispose();
+    }
+
+    [Fact]
+    public void 退化狀態下確定命令停用()
+    {
+        var vm = Create(imageLoader: _ => Track(MakeOpaque(8, 8)), storedFiles: new[] { @"C:\store\bg.jpg" });
+        vm.SelectedSource = vm.Sources.First(s => s.Source.Kind == CursorSourceKind.ImageFile);
+        Assert.True(vm.ConfirmCommand.CanExecute(null));
+
+        vm.RemoveBackgroundEnabled = true; // 全背景 → 退化 → CurrentCurBytes = null
+
+        Assert.False(vm.ConfirmCommand.CanExecute(null));
+    }
 }

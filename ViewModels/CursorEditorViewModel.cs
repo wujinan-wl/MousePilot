@@ -91,6 +91,7 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
     private System.Windows.Input.Cursor? _previewCursor;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
     private byte[]? _currentCurBytes;
 
     [ObservableProperty]
@@ -143,6 +144,13 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
 
     partial void OnHotspotXChanged(int value)
     {
+        var clamped = Math.Clamp(value, 0, SelectedSize - 1);
+        if (clamped != value)
+        {
+            HotspotX = clamped; // 夾制後重新觸發本 handler 一次（等值防重入）
+            return;
+        }
+
         if (!_applyingDefaults)
         {
             Rebuild();
@@ -151,6 +159,13 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
 
     partial void OnHotspotYChanged(int value)
     {
+        var clamped = Math.Clamp(value, 0, SelectedSize - 1);
+        if (clamped != value)
+        {
+            HotspotY = clamped; // 夾制後重新觸發本 handler 一次（等值防重入）
+            return;
+        }
+
         if (!_applyingDefaults)
         {
             Rebuild();
@@ -223,15 +238,17 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
         CloseRequested?.Invoke();
     }
 
-    private bool CanConfirm() => SelectedSource is not null;
+    private bool CanConfirm() => SelectedSource is not null && CurrentCurBytes is not null;
 
     private void Rebuild()
     {
+        var oldCursor = PreviewCursor;
         Warning = "";
         CurrentCurBytes = null;
         PreviewCursor = null;
         PreviewImage = null;
         SourceSizeText = "—";
+        oldCursor?.Dispose(); // binding 已切回預設游標後才釋放舊顆（unmanaged handle）
         if (SelectedSource is not { } item)
         {
             return;
@@ -257,7 +274,7 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
                     break;
             }
         }
-        catch (Exception ex) when (ex is IOException or ArgumentException or OutOfMemoryException)
+        catch (Exception ex) when (ex is IOException or ArgumentException or OutOfMemoryException or UnauthorizedAccessException)
         {
             Warning = $"預覽建立失敗：{ex.Message}"; // 規格 §21：不 crash
         }
@@ -280,6 +297,8 @@ public partial class CursorEditorViewModel : ObservableObject, IDisposable
     {
         _loadedSource?.Dispose();
         _loadedSource = null;
+        PreviewCursor?.Dispose();
+        PreviewCursor = null;
     }
 
     private void RebuildFromImageFile(string path)
