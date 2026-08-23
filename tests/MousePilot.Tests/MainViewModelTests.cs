@@ -446,6 +446,44 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     [Fact]
+    public void 編輯游標確認後刷新顯示()
+    {
+        var vm = CreateVmWithStartup(new NoOpStartupService());
+        vm.AttachCursorEditorLauncher(editorVm =>
+        {
+            editorVm.SelectedSource = editorVm.Sources.First(s => s.Source.Id == "preset:Heart");
+            editorVm.ConfirmCommand.Execute(null);
+            return true;
+        });
+
+        vm.EditCursorCommand.Execute(null);
+
+        Assert.Equal("Heart", vm.Settings.CursorPreset);
+        Assert.Contains("愛心", vm.CursorFileText);
+        Assert.Contains("32", vm.CursorFileText);
+    }
+
+    [Fact]
+    public void 編輯游標取消不改設定()
+    {
+        var vm = CreateVmWithStartup(new NoOpStartupService());
+        vm.AttachCursorEditorLauncher(_ => false);
+
+        vm.EditCursorCommand.Execute(null);
+
+        Assert.Equal("", vm.Settings.CursorPreset);
+        Assert.Equal("未選擇", vm.CursorFileText);
+    }
+
+    [Fact]
+    public void 未接上編輯器時命令不當機()
+    {
+        var vm = CreateVmWithStartup(new NoOpStartupService());
+        var ex = Record.Exception(() => vm.EditCursorCommand.Execute(null));
+        Assert.Null(ex);
+    }
+
+    [Fact]
     public void 啟動時依設定註冊兩組快捷鍵()
     {
         var hotkeys = new HotkeyHarness();

@@ -133,6 +133,7 @@
                         <Run Text="已匯入："/><Run Text="{Binding CursorFileText, Mode=OneWay}"/>
                     </TextBlock>
                     <StackPanel Orientation="Horizontal">
+                        <Button Content="選擇 / 編輯游標" Command="{Binding EditCursorCommand}" Padding="12,6" Margin="0,0,8,0"/>
                         <Button Content="匯入圖片" Command="{Binding ImportCursorCommand}" Padding="12,6" Margin="0,0,8,0"/>
                         <Button Content="移除圖片" Command="{Binding RemoveCursorCommand}" Padding="12,6" Margin="0,0,8,0"/>
                         <Button Content="套用" IsEnabled="False" Padding="12,6" Margin="0,0,8,0"

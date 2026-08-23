@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -19,6 +20,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly HotkeyService _hotkeyService;
     private readonly CursorImportService _cursorImportService;
     private readonly Func<string?> _cursorFilePicker;
+    private Func<CursorEditorViewModel, bool?>? _cursorEditorLauncher;
     private CancellationTokenSource? _moveCts;
     private bool _moving;
     private bool _movingFromAutoCycle;
@@ -64,8 +66,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         StartupService? startupService = null,
         HotkeyService? hotkeyService = null,
         CursorImportService? cursorImportService = null,
-        Func<string?>? cursorFilePicker = null)
+        Func<string?>? cursorFilePicker = null,
+        Func<CursorEditorViewModel, bool?>? cursorEditorLauncher = null)
     {
+        _cursorEditorLauncher = cursorEditorLauncher;
         _settingsService = settingsService;
         var result = settingsService.Load();
         Settings = result.Settings;
@@ -272,8 +276,37 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private (int? Width, int? Height) _lastImportSize;
 
+    /// <summary>View 於 Loaded 時注入編輯視窗啟動器（測試直接注入 fake）。</summary>
+    public void AttachCursorEditorLauncher(Func<CursorEditorViewModel, bool?> launcher)
+        => _cursorEditorLauncher = launcher;
+
+    [RelayCommand]
+    private void EditCursor()
+    {
+        if (_cursorEditorLauncher is null)
+        {
+            return; // 尚未接上 View（防呆，不當機）
+        }
+
+        var editorVm = new CursorEditorViewModel(Settings);
+        if (_cursorEditorLauncher(editorVm) == true)
+        {
+            SaveSettings();
+            _lastImportSize = (null, null);
+            RefreshCursorFileText();
+            RemoveCursorCommand.NotifyCanExecuteChanged();
+        }
+    }
+
     private void RefreshCursorFileText()
     {
+        if (Settings.CursorPreset.Length > 0)
+        {
+            var preset = CursorGallery.Presets.FirstOrDefault(p => p.Id == Settings.CursorPreset);
+            CursorFileText = $"{preset?.DisplayName ?? Settings.CursorPreset}（{Settings.CursorSize} px）";
+            return;
+        }
+
         if (Settings.CursorFile.Length == 0)
         {
             CursorFileText = "未選擇";

@@ -11,6 +11,14 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Loaded += (_, _) =>
+        {
+            if (DataContext is MainViewModel vm)
+            {
+                vm.AttachCursorEditorLauncher(editorVm =>
+                    new CursorEditorWindow(editorVm) { Owner = this }.ShowDialog());
+            }
+        };
     }
 
     protected override void OnClosing(CancelEventArgs e)
