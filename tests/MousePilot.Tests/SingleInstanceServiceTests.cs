@@ -87,6 +87,25 @@ public class SingleInstanceServiceTests
     }
 
     [Fact]
+    public void 名稱被其他型別占用時fail_open取得()
+    {
+        var name = UniqueName();
+        using var squatter = new EventWaitHandle(false, EventResetMode.ManualReset, name); // 占用 mutex 名稱
+
+        using var svc = new SingleInstanceService(name);
+
+        Assert.True(svc.TryAcquire()); // kernel object 例外 → fail-open：寧可多開也不可啟動即 crash（規格 §21）
+    }
+
+    [Fact]
+    public void TryAcquire重複呼叫丟例外()
+    {
+        using var svc = new SingleInstanceService(UniqueName());
+        Assert.True(svc.TryAcquire());
+        Assert.Throws<InvalidOperationException>(() => svc.TryAcquire());
+    }
+
+    [Fact]
     public void 未取得者Dispose不影響持有者()
     {
         var name = UniqueName();

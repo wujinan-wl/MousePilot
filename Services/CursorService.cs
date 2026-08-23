@@ -49,14 +49,22 @@ public class CursorService : IDisposable
             return false;
         }
 
+        // write-ahead：先立 marker 再替換——若替換成功瞬間被強殺，下次啟動仍會補救。
+        // 失敗時只在「先前未套用」才清 marker（已套用中的失敗，系統游標仍是自訂的，marker 必須留）。
+        var wasApplied = IsApplied;
+        WriteMarker();
         // SetSystemCursor 接管並銷毀傳入 handle（Spike B）；失敗時必須自行銷毀避免洩漏
         if (!_setSystemCursor(handle))
         {
             _destroyCursor(handle);
+            if (!wasApplied)
+            {
+                DeleteMarker();
+            }
+
             return false;
         }
 
-        WriteMarker();
         IsApplied = true;
         return true;
     }

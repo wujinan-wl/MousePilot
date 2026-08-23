@@ -95,6 +95,19 @@ public sealed class CursorServiceTests : IDisposable
         Assert.False(File.Exists(MarkerPath));
     }
 
+    [Fact]
+    public void 已套用後再套用失敗時marker保留()
+    {
+        var setResults = new Queue<bool>(new[] { true, false });
+        var svc = Create(set: _ => setResults.Dequeue());
+        Assert.True(svc.Apply(CurPath));   // 第一次成功——游標已被替換
+
+        Assert.False(svc.Apply(CurPath));  // 第二次失敗
+
+        Assert.True(svc.HasPendingRestore); // 系統游標仍是自訂的——marker 必須留著
+        Assert.True(svc.IsApplied);
+    }
+
     // === Dispose 保險 ===
 
     [Fact]

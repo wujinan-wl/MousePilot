@@ -1,3 +1,4 @@
+using System.IO;
 using System.Threading;
 
 namespace MousePilot.Services;
@@ -31,34 +32,49 @@ public sealed class SingleInstanceService : IDisposable
     /// </summary>
     public bool TryAcquire()
     {
+        if (_ownerThread is not null)
+        {
+            throw new InvalidOperationException("TryAcquire 只能呼叫一次（重複呼叫會令第一持有緒永久等待）。");
+        }
+
         using var acquiredSignal = new ManualResetEventSlim(false);
         var acquired = false;
 
         _ownerThread = new Thread(() =>
         {
-            using var mutex = new Mutex(initiallyOwned: false, _baseName);
             try
             {
-                acquired = mutex.WaitOne(0);
-            }
-            catch (AbandonedMutexException)
-            {
-                acquired = true; // 前實例 crash 未釋放——接手（計畫決策 3）
-            }
-
-            acquiredSignal.Set();
-
-            if (acquired)
-            {
-                _releaseSignal.Wait();
+                using var mutex = new Mutex(initiallyOwned: false, _baseName);
                 try
                 {
-                    mutex.ReleaseMutex();
+                    acquired = mutex.WaitOne(0);
                 }
-                catch (ApplicationException)
+                catch (AbandonedMutexException)
                 {
-                    // 非取得緒釋放——程序結束時 OS 自動釋放，安全忽略
+                    acquired = true; // 前實例 crash 未釋放——接手（計畫決策 3）
                 }
+
+                acquiredSignal.Set();
+
+                if (acquired)
+                {
+                    _releaseSignal.Wait();
+                    try
+                    {
+                        mutex.ReleaseMutex();
+                    }
+                    catch (ApplicationException)
+                    {
+                        // 防禦性——重設計後取得與釋放同緒，理論上不會發生
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is WaitHandleCannotBeOpenedException or UnauthorizedAccessException or IOException)
+            {
+                // kernel object 名稱被其他型別占用/ACL 拒絕：fail-open——寧可失去單一實例保證也不可啟動即 crash（規格 §21）
+                acquired = true;
+                acquiredSignal.Set();
+                _releaseSignal.Wait();
             }
         })
         {
@@ -93,7 +109,7 @@ public sealed class SingleInstanceService : IDisposable
 
     public void Dispose()
     {
-        _waitRegistration?.Unregister(null);
+        _waitRegistration?.Unregister(_wakeEvent);
         _waitRegistration = null;
 
         if (_owned)
