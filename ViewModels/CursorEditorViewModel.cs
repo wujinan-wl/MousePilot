@@ -33,12 +33,14 @@ public partial class CursorSourceItem : ObservableObject
 /// 游標編輯器（規格 §9/§10/補三~補八）。全邏輯可測：影像來源、WPF Cursor 建立、檔案列舉皆注入。
 /// 管線順序固定：去背（左上角參考色）→ 裁切 → 縮放 → Write（Phase 7 移交約束）。預覽絕不動全域游標。
 /// </summary>
-public partial class CursorEditorViewModel : ObservableObject
+public partial class CursorEditorViewModel : ObservableObject, IDisposable
 {
     private readonly AppSettings _settings;
     private readonly Func<string, Bitmap?> _imageLoader;
     private readonly Func<byte[], System.Windows.Input.Cursor?> _cursorFactory;
     private bool _applyingDefaults;
+    private Bitmap? _loadedSource;
+    private string? _loadedSourcePath;
 
     public event Action? CloseRequested;
 
@@ -261,10 +263,29 @@ public partial class CursorEditorViewModel : ObservableObject
         }
     }
 
+    /// <summary>按路徑快取 loader 載入的原圖：同一來源反覆 Rebuild 不重複解碼；換來源時釋放舊圖。</summary>
+    private Bitmap? LoadSourceCached(string path)
+    {
+        if (_loadedSourcePath != path || _loadedSource is null)
+        {
+            _loadedSource?.Dispose();
+            _loadedSource = _imageLoader(path);
+            _loadedSourcePath = path;
+        }
+
+        return _loadedSource;
+    }
+
+    public void Dispose()
+    {
+        _loadedSource?.Dispose();
+        _loadedSource = null;
+    }
+
     private void RebuildFromImageFile(string path)
     {
-        // 不 Dispose：imageLoader 可能回傳共用/快取的 Bitmap（所有權留給呼叫端），VM 只 Dispose 自己產生的中介影像。
-        var source = _imageLoader(path);
+        // 不 Dispose：來源由 _loadedSource 快取持有所有權，換來源或 VM Dispose 時才釋放。
+        var source = LoadSourceCached(path);
         if (source is null)
         {
             Warning = "圖片載入失敗（檔案可能已被移除或損毀）。";
