@@ -28,7 +28,7 @@
 | 7 | Cursor Import（含內建圖案庫） | ✅ 完成 | `2026-08-21-phase7-cursor-import.md` |
 | 8 | Hotspot Editor + Preview | ✅ 完成 | `2026-08-23-phase8-hotspot-editor.md` |
 | 9 | Global Cursor 套用/恢復 | ✅ 完成 | `2026-08-23-phase9-global-cursor.md` |
-| 10 | Single Instance | ⬜ 未開始 | 〃 |
+| 10 | Single Instance | ✅ 完成 | `2026-08-24-phase10-single-instance.md` |
 | 11 | Exception Handling / Log | ⬜ 未開始 | 〃 |
 | 12 | Publish Single EXE + 文件交付 | ⬜ 未開始 | 〃 |
 
