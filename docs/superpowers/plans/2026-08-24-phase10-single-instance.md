@@ -133,6 +133,8 @@ Expected: 編譯失敗（SingleInstanceService 不存在）。
 
 - [ ] **Step 3: 實作（`Services/SingleInstanceService.cs`）**
 
+> **Review 修正註記**：原計畫在呼叫緒直接 `WaitOne(0)` 判定——經實測 Win32 named Mutex 擁有權以執行緒為單位且**同緒可重入**（即使不同 handle），同緒的第二個 service 也會取得成功（計畫自帶測試必紅）。改為專屬背景執行緒持有 mutex（阻塞至 Dispose 釋放），順帶修正 ReleaseMutex 執行緒親和問題。以下為實際落地版本。
+
 ```csharp
 using System.Threading;
 
@@ -144,31 +146,67 @@ namespace MousePilot.Services;
 /// </summary>
 public sealed class SingleInstanceService : IDisposable
 {
-    private readonly Mutex _mutex;
+    private readonly string _baseName;
     private readonly EventWaitHandle _wakeEvent;
+    private readonly ManualResetEventSlim _releaseSignal = new(initialState: false);
     private RegisteredWaitHandle? _waitRegistration;
+    private Thread? _ownerThread;
     private bool _owned;
 
     public SingleInstanceService(string? name = null)
     {
-        var baseName = name ?? "MousePilot-SingleInstance";
-        _mutex = new Mutex(initiallyOwned: false, baseName);
-        _wakeEvent = new EventWaitHandle(false, EventResetMode.AutoReset, baseName + "-wake");
+        _baseName = name ?? "MousePilot-SingleInstance";
+        _wakeEvent = new EventWaitHandle(false, EventResetMode.AutoReset, _baseName + "-wake");
     }
 
     public event Action? WakeRequested;
 
-    /// <summary>true = 本程序為第一實例（取得所有權並開始監聽喚醒訊號）。</summary>
+    /// <summary>
+    /// true = 本程序為第一實例（取得所有權並開始監聽喚醒訊號）。
+    /// 注意：Win32 named Mutex 的擁有權以「執行緒」為單位（同執行緒對同一 named mutex 可重入取得，
+    /// 即使透過不同的 Mutex handle）。因此判定與持有動作固定綁在專屬背景執行緒上執行，
+    /// 該執行緒直到 Dispose() 才釋放 mutex 並結束——避免呼叫端執行緒重入造成誤判「已取得」。
+    /// </summary>
     public bool TryAcquire()
     {
-        try
+        using var acquiredSignal = new ManualResetEventSlim(false);
+        var acquired = false;
+
+        _ownerThread = new Thread(() =>
         {
-            _owned = _mutex.WaitOne(0);
-        }
-        catch (AbandonedMutexException)
+            using var mutex = new Mutex(initiallyOwned: false, _baseName);
+            try
+            {
+                acquired = mutex.WaitOne(0);
+            }
+            catch (AbandonedMutexException)
+            {
+                acquired = true; // 前實例 crash 未釋放——接手（計畫決策 3）
+            }
+
+            acquiredSignal.Set();
+
+            if (acquired)
+            {
+                _releaseSignal.Wait();
+                try
+                {
+                    mutex.ReleaseMutex();
+                }
+                catch (ApplicationException)
+                {
+                    // 非取得緒釋放——程序結束時 OS 自動釋放，安全忽略
+                }
+            }
+        })
         {
-            _owned = true; // 前實例 crash 未釋放——接手（計畫決策 3）
-        }
+            IsBackground = true,
+            Name = "SingleInstanceService-Owner",
+        };
+        _ownerThread.Start();
+        acquiredSignal.Wait();
+
+        _owned = acquired;
 
         if (_owned)
         {
@@ -186,22 +224,16 @@ public sealed class SingleInstanceService : IDisposable
     {
         _waitRegistration?.Unregister(null);
         _waitRegistration = null;
+
         if (_owned)
         {
-            try
-            {
-                _mutex.ReleaseMutex();
-            }
-            catch (ApplicationException)
-            {
-                // 非取得緒釋放——程序結束時 OS 自動釋放，安全忽略
-            }
-
+            _releaseSignal.Set();
+            _ownerThread?.Join();
             _owned = false;
         }
 
-        _mutex.Dispose();
         _wakeEvent.Dispose();
+        _releaseSignal.Dispose();
     }
 }
 ```
