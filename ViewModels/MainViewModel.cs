@@ -256,7 +256,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanRemoveCursor))]
     private void RemoveCursor()
     {
-        _cursorImportService.Remove(Settings.CursorFile);
+        if (!_cursorImportService.Remove(Settings.CursorFile))
+        {
+            Notice = "無法刪除游標檔案（可能被占用），設定未變更。"; // Phase 7 移交修復：失敗不清設定防孤兒
+            return;
+        }
+
         Settings.CursorFile = "";
         _lastImportSize = (null, null);
         RefreshCursorFileText();

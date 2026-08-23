@@ -121,6 +121,19 @@ public sealed class CursorImportServiceTests : IDisposable
     }
 
     [Fact]
+    public void 損毀cur回傳錯誤且不留殘檔()
+    {
+        var path = Path.Combine(_sourceDir, "bad.cur");
+        File.WriteAllBytes(path, new byte[] { 0, 0, 9, 9, 1, 0 });
+
+        var result = Create().Import(path);
+
+        Assert.False(result.Success);
+        Assert.Contains("CUR", result.Error);
+        Assert.Empty(Directory.GetFiles(Path.Combine(_dir, "store")));
+    }
+
+    [Fact]
     public void Remove只刪儲存目錄內的檔案()
     {
         var service = Create();

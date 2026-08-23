@@ -543,6 +543,7 @@ public sealed class MainViewModelTests : IDisposable
         public CursorImportResult NextResult = new(true, @"C:\store\cat.png", null, 32, 32);
         public List<string> Imported { get; } = new();
         public List<string> Removed { get; } = new();
+        public bool RemoveResult = true;
 
         public FakeCursorImportService() : base(@"C:\store") { }
 
@@ -555,7 +556,7 @@ public sealed class MainViewModelTests : IDisposable
         public override bool Remove(string storedPath)
         {
             Removed.Add(storedPath);
-            return true;
+            return RemoveResult;
         }
     }
 
@@ -592,6 +593,20 @@ public sealed class MainViewModelTests : IDisposable
         Assert.Equal(@"C:\pics\cat.png", cursor.Imported.Single());
         Assert.Equal(@"C:\store\cat.png", vm.Settings.CursorFile);
         Assert.Equal("cat.png（32x32）", vm.CursorFileText);
+        Assert.True(vm.RemoveCursorCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void 移除失敗時保留設定並提示()
+    {
+        var cursor = new FakeCursorImportService { RemoveResult = false };
+        var vm = CreateVmWithCursor(cursor, @"C:\pics\cat.png");
+        vm.ImportCursorCommand.Execute(null);
+
+        vm.RemoveCursorCommand.Execute(null);
+
+        Assert.Equal(@"C:\store\cat.png", vm.Settings.CursorFile); // 不清設定（Phase 7 移交修復）
+        Assert.Contains("無法刪除", vm.Notice);
         Assert.True(vm.RemoveCursorCommand.CanExecute(null));
     }
 
