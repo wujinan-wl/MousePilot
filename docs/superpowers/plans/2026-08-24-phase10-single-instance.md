@@ -73,10 +73,28 @@ public class SingleInstanceServiceTests
         Assert.True(first.TryAcquire());
         using var woken = new ManualResetEventSlim(false);
         first.WakeRequested += woken.Set;
+        first.StartListening();
 
         second.SignalFirstInstance();
 
         Assert.True(woken.Wait(TimeSpan.FromSeconds(5)), "5 秒內未收到喚醒訊號");
+    }
+
+    [Fact]
+    public void 監聽前的喚醒訊號不丟失()
+    {
+        var name = UniqueName();
+        using var first = new SingleInstanceService(name);
+        using var second = new SingleInstanceService(name);
+        Assert.True(first.TryAcquire());
+
+        second.SignalFirstInstance(); // 尚未 StartListening——AutoReset event latch 住
+
+        using var woken = new ManualResetEventSlim(false);
+        first.WakeRequested += woken.Set;
+        first.StartListening();
+
+        Assert.True(woken.Wait(TimeSpan.FromSeconds(5)), "latch 的喚醒訊號未於註冊時補觸發");
     }
 
     [Fact]
@@ -207,14 +225,22 @@ public sealed class SingleInstanceService : IDisposable
         acquiredSignal.Wait();
 
         _owned = acquired;
+        return _owned;
+    }
 
-        if (_owned)
+    /// <summary>
+    /// 訂閱 WakeRequested 之後呼叫：開始監聽喚醒訊號。
+    /// AutoReset event 具 latch 語意——呼叫前抵達的 Signal 會在註冊瞬間補觸發，訂閱後才監聽即可完全關閉喚醒丟失窗（final review 修正）。
+    /// </summary>
+    public void StartListening()
+    {
+        if (!_owned || _waitRegistration is not null)
         {
-            _waitRegistration = ThreadPool.RegisterWaitForSingleObject(
-                _wakeEvent, (_, _) => WakeRequested?.Invoke(), null, Timeout.Infinite, executeOnlyOnce: false);
+            return;
         }
 
-        return _owned;
+        _waitRegistration = ThreadPool.RegisterWaitForSingleObject(
+            _wakeEvent, (_, _) => WakeRequested?.Invoke(), null, Timeout.Infinite, executeOnlyOnce: false);
     }
 
     /// <summary>第二實例呼叫：通知第一實例開啟 Dashboard。</summary>
@@ -298,7 +324,8 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
 3. `OnStartup` 內 tray wiring 區之後（或緊接 `vm` 建立後）加喚醒訂閱：
 
 ```csharp
-        _singleInstance.WakeRequested += () => Dispatcher.Invoke(ShowDashboard); // threadpool → UI thread
+        _singleInstance.WakeRequested += () => Dispatcher.BeginInvoke(ShowDashboard); // BeginInvoke：dispatcher 關閉時靜默 abort（final review 修正）
+        _singleInstance.StartListening(); // 訂閱後才開始監聽——關閉啟動期喚醒丟失窗（final review 修正）
 ```
 
 4. `ExitApplication`（§30 步驟 8）：
@@ -361,7 +388,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
 
 ## Phase 10 完成定義
 
-- [ ] build 0 error、測試全綠（預期 248）、publish 成功、雙實例冒煙通過。
+- [ ] build 0 error、測試全綠（預期 248；final review 修正後 249——新增「監聽前的喚醒訊號不丟失」）、publish 成功、雙實例冒煙通過。
 - [ ] 單元測試涵蓋：取得/衝突/喚醒送達/釋放後再取得/abandoned 接手/未持有者 Dispose 隔離。
 - [ ] **使用者實機手動驗證（§34 案例 28）：**
   1. 啟動 MousePilot（縮在 Tray）→ 再雙擊 `MousePilot.exe` → **不會多開**，原實例 Dashboard 自動跳出並取得焦點。
