@@ -10,13 +10,33 @@ public partial class App : Application
 {
     private MainViewModel? _mainViewModel;
     private TrayIconService? _tray;
+    private CursorService? _cursorService;
     private bool _exiting;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
-        var vm = new MainViewModel(new SettingsService()); // 區域變數供 lambda 捕捉（避免 nullable 欄位的 CS8602 警告）
+        _cursorService = new CursorService();
+
+        if (e.Args.Contains("--restore-cursor"))
+        {
+            _cursorService.Restore(); // 緊急補救參數（Spike B --restore-only 語意）：恢復後直接結束
+            Shutdown();
+            return;
+        }
+
+        if (_cursorService.HasPendingRestore)
+        {
+            _cursorService.Restore(); // 上次未正常恢復（crash）——先補救再繼續啟動
+        }
+
+        // 未處理例外最小 hook（Phase 11 才有完整 handler）：只恢復游標，不吞例外
+        DispatcherUnhandledException += (_, _) => _cursorService?.Restore();
+        AppDomain.CurrentDomain.UnhandledException += (_, _) => _cursorService?.Restore();
+        SessionEnding += (_, _) => _cursorService?.Restore(); // Windows 登出/關機
+
+        var vm = new MainViewModel(new SettingsService(), cursorService: _cursorService); // 區域變數供 lambda 捕捉（避免 nullable 欄位的 CS8602 警告）
         _mainViewModel = vm;
         var window = new MainWindow { DataContext = vm };
         MainWindow = window;
@@ -28,8 +48,16 @@ public partial class App : Application
         _tray.PauseRequested += () => { if (vm.PauseCommand.CanExecute(null)) { vm.PauseCommand.Execute(null); } };
         _tray.MoveOnceRequested += () => vm.MoveOnceCommand.Execute(null);
         _tray.ExitRequested += ExitApplication;
+        _tray.EnableCursorRequested += () => { if (vm.ApplyCursorCommand.CanExecute(null)) { vm.ApplyCursorCommand.Execute(null); } };
+        _tray.DisableCursorRequested += () => vm.RestoreCursorCommand.Execute(null);
+        _tray.RestoreCursorRequested += () => vm.RestoreCursorCommand.Execute(null);
         vm.PropertyChanged += OnViewModelPropertyChanged;
         _tray.UpdateStatus(vm.Status, vm.StatusText);
+
+        if (vm.Settings.CustomCursorEnabled && vm.ApplyCursorCommand.CanExecute(null))
+        {
+            vm.ApplyCursorCommand.Execute(null); // 延續上次套用狀態（計畫決策 3）
+        }
 
         if (!vm.Settings.StartMinimized)
         {
@@ -91,6 +119,7 @@ public partial class App : Application
 
         _exiting = true;
         _mainViewModel?.Dispose();      // 1~4：取消進行中移動、解除快捷鍵、停止輪詢 timer
+        _cursorService?.Dispose();      // 5：恢復游標（已套用才動作）
         _tray?.Dispose();               // 6：系統匣圖示
         _mainViewModel?.SaveSettings(); // 7：保存設定
         Shutdown();                     // 9：關閉程式
@@ -104,6 +133,7 @@ public partial class App : Application
             _mainViewModel?.SaveSettings();
             _mainViewModel?.Dispose();
             _tray?.Dispose();
+            _cursorService?.Dispose();
         }
 
         base.OnExit(e);
