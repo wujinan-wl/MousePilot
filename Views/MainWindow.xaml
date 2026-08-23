@@ -46,6 +46,9 @@
                                         <DataTrigger Binding="{Binding Status}" Value="AutoMoving">
                                             <Setter Property="Fill" Value="{StaticResource StatusWaitingBrush}"/>
                                         </DataTrigger>
+                                        <DataTrigger Binding="{Binding Status}" Value="Error">
+                                            <Setter Property="Fill" Value="{StaticResource StatusErrorBrush}"/>
+                                        </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </Ellipse.Style>

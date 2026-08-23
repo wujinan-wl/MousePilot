@@ -36,12 +36,12 @@ public class MouseMovementServiceTests
     public async Task 左右模式往返移動並回原位()
     {
         var h = new Harness();
-        Assert.True(await h.Service.ExecuteMoveAsync(CancellationToken.None));
+        Assert.Equal(MoveResult.Success, await h.Service.ExecuteMoveAsync(CancellationToken.None));
         Assert.Equal(new[] { (503, 300), (500, 300) }, h.Sent); // +3 → 回原位
         Assert.Equal(1, h.DelayCalls);
 
         h.Sent.Clear();
-        Assert.True(await h.Service.ExecuteMoveAsync(CancellationToken.None));
+        Assert.Equal(MoveResult.Success, await h.Service.ExecuteMoveAsync(CancellationToken.None));
         Assert.Equal((497, 300), h.Sent[0]); // 往返：第二次 -3
     }
 
@@ -50,7 +50,7 @@ public class MouseMovementServiceTests
     {
         var h = new Harness();
         h.Settings.ReturnToOriginalPosition = false;
-        Assert.True(await h.Service.ExecuteMoveAsync(CancellationToken.None));
+        Assert.Equal(MoveResult.Success, await h.Service.ExecuteMoveAsync(CancellationToken.None));
         Assert.Single(h.Sent);
         Assert.Equal(0, h.DelayCalls);
     }
@@ -59,7 +59,7 @@ public class MouseMovementServiceTests
     public async Task 游標讀取失敗時放棄且不送出()
     {
         var h = new Harness { Cursor = null };
-        Assert.False(await h.Service.ExecuteMoveAsync(CancellationToken.None));
+        Assert.Equal(MoveResult.ConservativeAbort, await h.Service.ExecuteMoveAsync(CancellationToken.None));
         Assert.Empty(h.Sent);
     }
 
@@ -78,7 +78,7 @@ public class MouseMovementServiceTests
         var h = new Harness();
         using var cts = new CancellationTokenSource();
         cts.Cancel();
-        Assert.False(await h.Service.ExecuteMoveAsync(cts.Token));
+        Assert.Equal(MoveResult.Cancelled, await h.Service.ExecuteMoveAsync(cts.Token));
         Assert.Empty(h.Sent); // 入口即檢查，去程也不送
     }
 
@@ -87,7 +87,7 @@ public class MouseMovementServiceTests
     {
         using var cts = new CancellationTokenSource();
         var h = new Harness(beforeReturn: _ => cts.Cancel()); // 等待期間被取消（真實輸入路徑）
-        Assert.False(await h.Service.ExecuteMoveAsync(cts.Token));
+        Assert.Equal(MoveResult.Cancelled, await h.Service.ExecuteMoveAsync(cts.Token));
         Assert.Single(h.Sent);                                 // 只送了去程，未返回
     }
 
@@ -95,7 +95,7 @@ public class MouseMovementServiceTests
     public async Task 返回前偵測到新輸入時放棄返回()
     {
         var h = new Harness(beforeReturn: x => x.LastInput = 999); // 等待期間出現鍵盤輸入
-        Assert.False(await h.Service.ExecuteMoveAsync(CancellationToken.None));
+        Assert.Equal(MoveResult.ConservativeAbort, await h.Service.ExecuteMoveAsync(CancellationToken.None));
         Assert.Single(h.Sent);
     }
 
@@ -103,7 +103,7 @@ public class MouseMovementServiceTests
     public async Task 返回前游標被移動時放棄返回()
     {
         var h = new Harness(beforeReturn: x => x.Cursor = (900, 900)); // 使用者動了滑鼠
-        Assert.False(await h.Service.ExecuteMoveAsync(CancellationToken.None));
+        Assert.Equal(MoveResult.ConservativeAbort, await h.Service.ExecuteMoveAsync(CancellationToken.None));
         Assert.Single(h.Sent);
     }
 

@@ -21,10 +21,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly Func<string?> _cursorFilePicker;
     private readonly CursorService _cursorService;
     private readonly Func<byte[], string?>? _confirmedCurWriter;
+    private readonly LogService? _log;
     private Func<CursorEditorViewModel, bool?>? _cursorEditorLauncher;
     private CancellationTokenSource? _moveCts;
     private bool _moving;
     private bool _movingFromAutoCycle;
+    private int _consecutiveMoveFailures;
+    private bool _errorLatched;
 
     public AppSettings Settings { get; }
 
@@ -70,11 +73,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
         Func<string?>? cursorFilePicker = null,
         Func<CursorEditorViewModel, bool?>? cursorEditorLauncher = null,
         CursorService? cursorService = null,
-        Func<byte[], string?>? confirmedCurWriter = null)
+        Func<byte[], string?>? confirmedCurWriter = null,
+        LogService? logService = null)
     {
         _cursorEditorLauncher = cursorEditorLauncher;
         _cursorService = cursorService ?? new CursorService();
         _confirmedCurWriter = confirmedCurWriter;
+        _log = logService;
         _settingsService = settingsService;
         var result = settingsService.Load();
         Settings = result.Settings;
@@ -83,6 +88,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             Notice = result.BackupPath is null
                 ? "設定檔損毀，已載入預設值。"
                 : $"設定檔損毀，已載入預設值（原檔備份：{result.BackupPath}）。";
+            _log?.Error("設定檔損毀，已載入預設值");
         }
 
         IdleService = (idleServiceFactory ?? (s => new IdleDetectionService(s)))(Settings);
@@ -131,7 +137,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _moveCts?.Cancel();
         }
 
-        Status = result.State;
+        Status = _errorLatched ? MonitorStatus.Error : result.State;
         IdleSeconds = result.IdleSeconds;
         MousePosition = cursor is { } c ? $"X={c.X}, Y={c.Y}" : "—";
         FirstTriggerText = result.SecondsUntilFirstTrigger is { } f ? $"{f:F0} 秒" : "—";
@@ -149,6 +155,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         if (_moving)
         {
+            _log?.Info("移動請求被忽略（前一次尚未完成，防重入）。");
             return; // 防重入：自動觸發與手動執行不重疊
         }
 
@@ -164,11 +171,39 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 IdleService.BeginMove();
             }
 
-            await _movementService.ExecuteMoveAsync(cts.Token);
+            var result = await _movementService.ExecuteMoveAsync(cts.Token);
+            switch (result)
+            {
+                case MoveResult.Success:
+                    _consecutiveMoveFailures = 0;
+                    _errorLatched = false;
+                    break;
+                case MoveResult.ConservativeAbort:
+                    _log?.Info("滑鼠移動保守放棄（可能偵測到使用者操作，不視為錯誤）。");
+                    break;
+                case MoveResult.Win32Failure:
+                    _consecutiveMoveFailures++;
+                    _log?.Error($"滑鼠移動失敗（Win32 呼叫失敗，連續 {_consecutiveMoveFailures} 次）");
+                    if (_consecutiveMoveFailures >= 3)
+                    {
+                        _errorLatched = true;
+                    }
+
+                    break;
+                case MoveResult.Cancelled:
+                default:
+                    break; // 使用者操作取消，不視為錯誤，不記錄
+            }
+
+            if (_errorLatched)
+            {
+                Status = MonitorStatus.Error;
+            }
         }
         catch (Exception ex)
         {
-            Notice = $"滑鼠移動失敗：{ex.Message}"; // Phase 11 接上 LogService 後記錄
+            Notice = $"滑鼠移動失敗：{ex.Message}";
+            _log?.Error("滑鼠移動發生未預期例外", ex);
         }
         finally
         {
@@ -193,6 +228,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             MonitorStatus.UserActive => "使用者活動中",
             MonitorStatus.WaitingToStart => "等待啟動",
             MonitorStatus.AutoMoving => "自動移動中",
+            MonitorStatus.Error => "錯誤（滑鼠移動失敗）",
             _ => value.ToString(),
         };
         StartCommand.NotifyCanExecuteChanged();
@@ -479,6 +515,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void StartMonitoring()
     {
+        _errorLatched = false;
+        _consecutiveMoveFailures = 0;
         Settings.Clamp();
         IdleService.Start();
     }

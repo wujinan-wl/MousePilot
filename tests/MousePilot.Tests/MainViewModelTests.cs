@@ -429,10 +429,15 @@ public sealed class MainViewModelTests : IDisposable
         StartupService startup,
         HotkeyService? hotkey = null,
         CursorService? cursorService = null,
-        Func<byte[], string?>? confirmedCurWriter = null)
+        Func<byte[], string?>? confirmedCurWriter = null,
+        LogService? logService = null)
     {
         Directory.CreateDirectory(_dir);
-        File.WriteAllText(SettingsPath, "{\"autoStartMonitoring\": false, \"idleStartSeconds\": 5}");
+        if (!File.Exists(SettingsPath)) // 呼叫端可能已預先寫入（含損毀內容）供測試場景使用，不覆蓋
+        {
+            File.WriteAllText(SettingsPath, "{\"autoStartMonitoring\": false, \"idleStartSeconds\": 5}");
+        }
+
         var clock = new TestClock();
         return new MainViewModel(new SettingsService(SettingsPath),
             s => new IdleDetectionService(s, () => clock.Now, () => clock.LastInput, () => (0, 0)),
@@ -448,7 +453,88 @@ public sealed class MainViewModelTests : IDisposable
             startup,
             hotkey ?? new HotkeyHarness().Service,
             cursorService: cursorService ?? new FakeCursorService(), // 預設 fake：任何經 helper 的測試絕不觸真實 Win32 游標 API
-            confirmedCurWriter: confirmedCurWriter ?? (_ => Path.Combine(_dir, "confirmed-cursor.cur")));
+            confirmedCurWriter: confirmedCurWriter ?? (_ => Path.Combine(_dir, "confirmed-cursor.cur")),
+            logService: logService);
+    }
+
+    private MainViewModel CreateVmWithFailingMove(LogService? log = null)
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(SettingsPath,
+            "{\"autoStartMonitoring\": false, \"idleStartSeconds\": 5, \"returnToOriginalPosition\": true}");
+        var clock = new TestClock();
+        var cursor = (X: 500, Y: 300);
+        return new MainViewModel(new SettingsService(SettingsPath),
+            s => new IdleDetectionService(s, () => clock.Now, () => clock.LastInput, () => cursor),
+            (s, idle) => new MouseMovementService(
+                s, idle,
+                cursorProvider: () => cursor,
+                boundsProvider: () => new ScreenBounds(0, 0, 1920, 1080),
+                sendMove: (_, _) => false,
+                correctPosition: (_, _) => true,
+                lastInputProvider: () => 0u,
+                delay: (_, _) => Task.CompletedTask,
+                randomIndexProvider: () => 3),
+            new NoOpStartupService(),
+            new HotkeyHarness().Service,
+            cursorService: new FakeCursorService(),
+            confirmedCurWriter: _ => Path.Combine(_dir, "confirmed-cursor.cur"),
+            logService: log);
+    }
+
+    [Fact]
+    public void 連續移動失敗三次進入錯誤狀態()
+    {
+        var vm = CreateVmWithFailingMove();
+        vm.StartCommand.Execute(null);
+
+        vm.MoveOnceCommand.Execute(null); // 1
+        vm.MoveOnceCommand.Execute(null); // 2
+        Assert.NotEqual(MonitorStatus.Error, vm.Status);
+        vm.MoveOnceCommand.Execute(null); // 3
+
+        Assert.Equal(MonitorStatus.Error, vm.Status);
+        Assert.Contains("錯誤", vm.StatusText);
+    }
+
+    [Fact]
+    public void 錯誤狀態由重新啟動解除()
+    {
+        var vm = CreateVmWithFailingMove();
+        vm.StartCommand.Execute(null);
+        for (var i = 0; i < 3; i++) { vm.MoveOnceCommand.Execute(null); }
+        Assert.Equal(MonitorStatus.Error, vm.Status);
+
+        vm.PauseCommand.Execute(null);
+        vm.StartCommand.Execute(null); // 重新啟動 → latch 解除
+
+        Assert.NotEqual(MonitorStatus.Error, vm.Status);
+    }
+
+    [Fact]
+    public void 移動失敗寫入log()
+    {
+        var dir = Path.Combine(_dir, "logs");
+        var log = new LogService(dir, clock: () => DateTime.Now);
+        var vm = CreateVmWithFailingMove(log);
+        vm.StartCommand.Execute(null);
+
+        vm.MoveOnceCommand.Execute(null);
+
+        Assert.Contains("[ERROR]", File.ReadAllText(Path.Combine(dir, "mousepilot.log")));
+    }
+
+    [Fact]
+    public void 設定損毀寫入log()
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(SettingsPath, "{ 不是 JSON");
+        var dir = Path.Combine(_dir, "logs");
+        var log = new LogService(dir, clock: () => DateTime.Now);
+
+        _ = CreateVmWithStartup(new NoOpStartupService(), logService: log);
+
+        Assert.Contains("設定", File.ReadAllText(Path.Combine(dir, "mousepilot.log")));
     }
 
     [Fact]

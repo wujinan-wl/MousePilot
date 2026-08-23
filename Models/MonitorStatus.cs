@@ -7,4 +7,5 @@ public enum MonitorStatus
     UserActive,
     WaitingToStart,
     AutoMoving,
+    Error,
 }
