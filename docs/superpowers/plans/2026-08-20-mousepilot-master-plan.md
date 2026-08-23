@@ -147,11 +147,14 @@
 - **移交事項（Phase 4 final review）：** (e) 未處理例外 crash 會跳過 OnExit → ghost tray icon + 設定未保存；預設 tray-only 模式下例外風險升高——全域 handler 必須包含 Tray.Dispose 與 SaveSettings（連同既有的恢復游標要求）。
 - **移交事項（Phase 9 final review）：** (i) 完整 handler 實作時把 App 的三個 restore hook（Dispatcher/AppDomain/SessionEnding）收斂為單一 `EmergencyRestore()`——含 VM 狀態刷新（修「取消登出後 UI 仍顯示已套用」的不同步）；(j) `CursorService` marker 改 write-ahead（SetSystemCursor 前寫入）——零成本封死「替換成功後、marker 寫入前被強殺」的微秒縫隙；(k) backlog（不急）：啟動 auto-apply 失敗時考慮清 `CustomCursorEnabled`（否則每次啟動重試+tray-only 下 Notice 不可見）；Tray「啟用自訂游標」未確認時點擊無回饋；`TrayIconServiceTests` 過時測試名 `游標三項於Phase9前停用` 改名。
 
+- **移交事項（Phase 10 final review）：** (l) `SingleInstanceService` 強化四件（併入例外處理任務）：kernel object 建立例外（`WaitHandleCannotBeOpenedException`/ACL 拒絕，發生在背景持有緒會直接殺程序）→ catch 後 fail-open（視為取得照常啟動）+ log；`ReleaseMutex` 的 catch 註解改「防禦性——重設計後理論上不會發生」；`Unregister(null)` 改 `Unregister(_wakeEvent)` 教科書收尾模式；`TryAcquire` 加重複呼叫守衛（`if (_ownerThread is not null) throw`——重複呼叫會令第一持有緒永卡）。(m) **時序不變式（完整 handler 實作時必須維持）：exception hooks 掛載必須在 mutex 取得之後**——第二實例掛了 hooks 反而會在自身出例外時清掉第一實例的游標。
+
 ## Phase 12：Publish + 文件交付
 
 - **目標：** publish 產出單一 EXE 並在乾淨環境驗證；README、使用說明、FAQ、Debug 方法、測試項目文件；跑完規格 §34 全部 31 個測試案例並記錄結果。
 - **驗收：** 規格 §39——EXE 複製到無 .NET 8 Runtime 的 Win10/11 x64 機器可直接執行。
 - **風險：** ReadyToRun/SingleFile 與 WPF 資源、embed cursor 資源的相容性；若需調整 csproj 參數要寫明原因。
+- **文件必載（Phase 9/10 final review 移交）：** (a) 快捷鍵設定檔格式為嚴格大小寫（Phase 6 註記）；(b) 單一實例行為：第二次啟動不多開、自動彈出 Dashboard；per-user——不同 Windows 使用者可各跑一份；(c) `--restore-cursor` 參數：緊急恢復游標，不受單一實例限制，可在另一實例存活時執行（會重載系統游標 scheme 的緊急覆寫語意）。
 
 ---
 
