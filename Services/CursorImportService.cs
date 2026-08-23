@@ -75,6 +75,27 @@ public class CursorImportService
         }
     }
 
+    /// <summary>列出儲存目錄內支援副檔名的檔案（完整路徑）；目錄不存在或讀取失敗回空清單。</summary>
+    public virtual IReadOnlyList<string> ListStored()
+    {
+        try
+        {
+            if (!Directory.Exists(_storageDir))
+            {
+                return Array.Empty<string>();
+            }
+
+            return Directory.GetFiles(_storageDir)
+                .Where(f => SupportedExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Array.Empty<string>();
+        }
+    }
+
     private string UniqueDestPath(string fileName)
     {
         var name = Path.GetFileNameWithoutExtension(fileName);

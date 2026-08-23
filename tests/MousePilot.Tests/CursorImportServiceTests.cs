@@ -145,4 +145,16 @@ public sealed class CursorImportServiceTests : IDisposable
         Assert.False(service.Remove(outside));   // 目錄外 → 拒絕
         Assert.True(File.Exists(outside));
     }
+
+    [Fact]
+    public void ListStored列出儲存目錄內支援的檔案()
+    {
+        var service = Create();
+        Assert.Empty(service.ListStored()); // 目錄尚未建立
+
+        var stored = service.Import(WritePng()).StoredPath!;
+        File.WriteAllText(Path.Combine(_dir, "store", "note.txt"), "x"); // 不支援副檔名應排除
+
+        Assert.Equal(new[] { stored }, service.ListStored());
+    }
 }
