@@ -127,6 +127,7 @@
 - **測試項目：** 規格 §34 案例 20~22；手動測正常關閉/Tray Exit/登出。
 - **風險：** 本專案最高風險點——實作順序固定為「恢復路徑先寫先測，替換後寫」。
 - **移交事項（Phase 6 final review）：** (a) F10 佔位分支在 `MainViewModel.OnHotkeyPressed`（接縫清楚，替換為真實恢復動作）；(b) 預設 tray-only 狀態下 hotkey 回饋（Notice）不可見——考慮 tray balloon 或同等機制讓 F10/占用提示在無視窗時可見。
+- **移交事項（Phase 8 final review，計畫第一項決策）：** (g) **WYSIWYG 缺口**：ImageFile 來源的去背開關/容差**沒有**存入 Settings，「確定」也未落地處理結果——Phase 9 從 Settings 重跑管線會得到「含背景」的不同結果。**建議方案（reviewer 首選，Phase 9 計畫拍板）**：「確定」時把 `CurrentCurBytes` 落地為 `%AppData%\MousePilot\Cursors\` 下實體 .cur（Settings 記路徑），三種來源統一走 `LoadCursorFromFile`，免重跑管線；次選為把去背參數存入 settings.json。(h) 載入端驗證：`AppSettings.Clamp()` 不驗 hotspot 範圍、也不驗 preset/file 互斥——Phase 9 載入套用前必須夾制 hotspot 並套「preset 優先」序（與 `RefreshCursorFileText` 一致）。(i) CursorFile（.cur/.ani）來源確定時寫入的 `CursorSize`/`CursorHotspotX/Y` 是停用控制項的殘值（僅供顯示）——套用時必須忽略、以檔內值為準。(j) 效能備忘：hotspot 變更目前重跑整條影像管線（等冪但大圖 O(W×H)×2）——若 Phase 9 動到 Rebuild，順手做 scaled-bitmap 快取（key：path+size+去背參數）即一併消化。
 - **移交事項（Phase 7 final review，硬性）：** (c) 圖片→.cur 組裝順序固定為 **RemoveBackground（JPG 需要時）→ TrimTransparent → ScaleProportional → CurFileFormat.Write**——JPG 無 alpha，先裁切是 no-op、去背產生的透明邊不會被裁掉，順序反了游標會縮水在透明邊距內；(d) 全背景 JPG 去背後退化為 1×1 透明 → 隱形游標，套用前必須防護（偵測退化並拒絕/提示）；(e) `CurFileFormat.Write` 前必須已縮放至 ≤256（Write 不防呆，>256 會 byte 截斷產生損毀檔）；(f) .ani 套用走 `LoadCursorFromFile`（Windows 原生支援，不自行解析動畫）。
 
 ## Phase 10：Single Instance
