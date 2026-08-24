@@ -177,6 +177,7 @@ public partial class App : Application
         if (!_exiting)
         {
             _mainViewModel?.SaveSettings();
+            _logService?.Info("程式結束（OnExit 保險路徑）");
             _mainViewModel?.Dispose();
             _tray?.Dispose();
             _cursorService?.Dispose();
