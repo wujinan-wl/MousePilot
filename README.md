@@ -47,6 +47,7 @@ bin\Release\net8.0-windows\win-x64\publish\MousePilot.exe
 
 ## 文件
 
+- [快速上手手冊](docs/manual.html) — 圖文簡易版（下載後瀏覽器開啟，三步開始使用）。
 - [使用說明](docs/user-guide.md) — Dashboard 導覽、閒置偵測設定、自訂游標完整流程、系統匣、開機自啟、全域快捷鍵等。
 - [常見問題（FAQ）](docs/faq.md)
 - [Debug 方法](docs/debugging.md) — Log 位置與輪替、`--restore-cursor` 緊急恢復參數、`settings.json` 手動編輯注意事項、原始碼 build/debug。
