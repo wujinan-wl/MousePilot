@@ -18,7 +18,22 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        try
+        {
+            StartupCore(e);
+        }
+        catch (Exception ex)
+        {
+            // 啟動期任何未預期例外：確保留下紀錄並讓使用者看得到（Win10 實機曾發生早期 crash 無任何線索）
+            (_logService ?? new LogService()).Error("啟動失敗（OnStartup）", ex);
+            try { _cursorService?.Restore(); } catch { /* 最後防線內不得再拋 */ }
+            MessageBox.Show($"MousePilot 啟動失敗：\n{ex}", "MousePilot", MessageBoxButton.OK, MessageBoxImage.Error);
+            throw;
+        }
+    }
 
+    private void StartupCore(StartupEventArgs e)
+    {
         _cursorService = new CursorService();
 
         if (e.Args.Contains("--restore-cursor"))
@@ -42,6 +57,7 @@ public partial class App : Application
         }
 
         _logService = new LogService(); // mutex 取得之後才建——第二實例不記 log
+        _logService.Info("啟動階段：單一實例通過");
 
         if (_singleInstance.AcquiredViaFailOpen)
         {
@@ -59,9 +75,11 @@ public partial class App : Application
 
         var vm = new MainViewModel(new SettingsService(), cursorService: _cursorService, logService: _logService); // 區域變數供 lambda 捕捉（避免 nullable 欄位的 CS8602 警告）
         _mainViewModel = vm;
+        _logService.Info("啟動階段：服務初始化完成");
         var window = new MainWindow { DataContext = vm };
         MainWindow = window;
         window.Closing += OnMainWindowClosing;
+        _logService.Info("啟動階段：主視窗建立完成");
 
         _tray = new TrayIconService();
         _tray.OpenRequested += ShowDashboard;
@@ -74,6 +92,7 @@ public partial class App : Application
         _tray.RestoreCursorRequested += () => vm.RestoreCursorCommand.Execute(null);
         vm.PropertyChanged += OnViewModelPropertyChanged;
         _tray.UpdateStatus(vm.Status, vm.StatusText);
+        _logService.Info("啟動階段：系統匣就緒");
 
         _singleInstance.WakeRequested += () => Dispatcher.BeginInvoke(ShowDashboard); // BeginInvoke：dispatcher 關閉時靜默 abort，不丟例外（review 修正）
         _singleInstance.StartListening(); // 訂閱後才開始監聽——關閉啟動期喚醒丟失窗（review 修正）
