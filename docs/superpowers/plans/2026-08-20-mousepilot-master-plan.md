@@ -30,7 +30,7 @@
 | 9 | Global Cursor 套用/恢復 | ✅ 完成 | `2026-08-23-phase9-global-cursor.md` |
 | 10 | Single Instance | ✅ 完成 | `2026-08-24-phase10-single-instance.md` |
 | 11 | Exception Handling / Log | ✅ 完成 | `2026-08-24-phase11-exception-log.md` |
-| 12 | Publish Single EXE + 文件交付 | ⬜ 未開始 | 〃 |
+| 12 | Publish Single EXE + 文件交付 | ✅ 完成 | `2026-08-24-phase12-publish-docs.md` |
 
 狀態：⬜ 未開始 / 🟡 進行中 / ✅ 完成 / ⛔ 阻塞
 
