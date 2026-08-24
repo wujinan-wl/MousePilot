@@ -4,13 +4,11 @@
 
 ## [Unreleased]
 
-### 新增
-- 原創 LOGO（程式繪製藍底徽章＋游標軌跡，`tools/LogoGen` 產生）：套用至 EXE 圖示、視窗標題列、系統匣圖示（載入失敗自動退回原綠圓）與 README。
-- 簡易使用者手冊 `docs/manual.html`：單檔離線可開的圖文快速上手（三步開始、狀態說明、自訂游標五步、快捷鍵、疑難速查），LOGO 內嵌。
-
 ## [1.0.0] - 2026-08-24
 
 ### 新增
+- 原創 LOGO（程式繪製藍底徽章＋游標軌跡，`tools/LogoGen` 產生）：套用至 EXE 圖示、視窗標題列、系統匣圖示（載入失敗自動退回原綠圓）與 README。
+- 簡易使用者手冊 `docs/manual.html`：單檔離線可開的圖文快速上手（三步開始、狀態說明、自訂游標五步、快捷鍵、疑難速查），LOGO 內嵌。
 - 專案文件：CLAUDE.md、需求規格、總體計畫、Phase 0+1 細部計畫。
 - Git 基礎設定：remote（github.com/wujinan-wl/MousePilot）、.gitignore、Release workflow（推送 v* tag 自動建置並發佈附 MousePilot.exe 的 GitHub Release）。
 - Spike A/B：SendInput 對 GetLastInputInfo 影響、SetSystemCursor 恢復機制實測結論（docs/superpowers/research/）。
