@@ -15,8 +15,33 @@ public partial class App : Application
     private LogService? _logService;
     private bool _exiting;
 
+    public App()
+    {
+        // 極早期開機紀錄（診斷用）：App 建構子是受控程式碼第一站——這行有寫出代表 .NET/WPF host 啟動成功，
+        // crash 發生在其後；沒寫出則 crash 在原生初始化（driver/host 層）。寫入失敗靜默。
+        BootTrace("App ctor");
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+            BootTrace($"AppDomain 例外：{args.ExceptionObject}");
+        DispatcherUnhandledException += (_, args) => BootTrace($"Dispatcher 例外：{args.Exception}");
+    }
+
+    private static void BootTrace(string message)
+    {
+        try
+        {
+            System.IO.File.AppendAllText(
+                System.IO.Path.Combine(System.IO.Path.GetTempPath(), "mousepilot-boot.log"),
+                $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}");
+        }
+        catch
+        {
+            // 診斷紀錄不得反噬
+        }
+    }
+
     protected override void OnStartup(StartupEventArgs e)
     {
+        BootTrace("OnStartup 進入");
         base.OnStartup(e);
         try
         {
