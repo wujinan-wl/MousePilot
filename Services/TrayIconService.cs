@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.IO;
 using System.Windows.Forms;
 using MousePilot.Models;
 using MousePilot.Native;
@@ -103,6 +104,21 @@ public sealed class TrayIconService : IDisposable
 
     private static Icon CreateIcon()
     {
+        // 優先用內嵌的 app LOGO（多尺寸 ico，系統匣取 16px）；載入失敗才退回程式繪製圓
+        try
+        {
+            using var stream = typeof(TrayIconService).Assembly
+                .GetManifestResourceStream("MousePilot.Assets.app.ico");
+            if (stream is not null)
+            {
+                return new Icon(stream, 16, 16);
+            }
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or OutOfMemoryException)
+        {
+            // 走 fallback
+        }
+
         using var bmp = new Bitmap(16, 16);
         using (var g = Graphics.FromImage(bmp))
         using (var brand = new SolidBrush(Color.FromArgb(22, 163, 74)))

@@ -15,17 +15,24 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>MousePilot</RootNamespace>
     <AssemblyName>MousePilot</AssemblyName>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
   </ItemGroup>
 
-  <!-- 測試與 spike 專案在子目錄，避免被主專案誤編 -->
+  <!-- 測試、spike 與工具專案在子目錄，避免被主專案誤編 -->
   <ItemGroup>
-    <Compile Remove="tests\**;spikes\**" />
-    <None Remove="tests\**;spikes\**" />
-    <Page Remove="tests\**;spikes\**" />
+    <Compile Remove="tests\**;spikes\**;tools\**" />
+    <None Remove="tests\**;spikes\**;tools\**" />
+    <Page Remove="tests\**;spikes\**;tools\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WPF 視窗 Icon 用 Resource；Tray 用 EmbeddedResource 串流載入 -->
+    <Resource Include="Assets\app.ico" />
+    <EmbeddedResource Include="Assets\app.ico" LogicalName="MousePilot.Assets.app.ico" />
   </ItemGroup>
 
   <ItemGroup>

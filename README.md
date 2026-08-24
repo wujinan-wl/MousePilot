@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="Assets/logo.png" width="112" alt="MousePilot LOGO"/>
+</p>
+
 # MousePilot
 
 Windows 桌面小工具：閒置一段時間後自動微移滑鼠，避免筆電進入螢幕保護／待機；同時支援自訂 Windows 滑鼠游標圖案（匯入圖片、Hotspot 編輯、預覽、全域套用與安全恢復）。純本機執行、Portable 單一 EXE，不需要安裝、不需要系統管理員權限。
