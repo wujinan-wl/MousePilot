@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> 個人工作偏好（語言、分階段開發、版本、Git、文件、測試等規範）見 [CLAUDE-preferences.md](CLAUDE-preferences.md)，**必須一併遵守**。本檔只記錄 MousePilot 專案本身的技術規範。
+> 個人工作偏好（語言、分階段開發、版本、Git、文件、測試等規範）見本機的 `CLAUDE-preferences.md`（不隨 repo 公開，故不設連結），**必須一併遵守**。本檔只記錄 MousePilot 專案本身的技術規範。
 
 ## 專案概述
 

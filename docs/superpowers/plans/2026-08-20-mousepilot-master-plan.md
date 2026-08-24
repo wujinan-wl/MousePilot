@@ -163,6 +163,7 @@
 - **文件必載（Phase 9/10 final review 移交）：** (a) 快捷鍵設定檔格式為嚴格大小寫（Phase 6 註記）；(b) 單一實例行為：第二次啟動不多開、自動彈出 Dashboard；per-user——不同 Windows 使用者可各跑一份；(c) `--restore-cursor` 參數：緊急恢復游標，不受單一實例限制，可在另一實例存活時執行（會重載系統游標 scheme 的緊急覆寫語意）。
 - **文件必載（Phase 11 final review 移交）：** (d) log 路徑 `%AppData%\MousePilot\Logs\mousepilot.log`、5MB 輪替保留 3 份歸檔；(e) 狀態紅點 Error 語意：滑鼠移動連續失敗 3 次進入、成功/重新啟動/暫停解除；(f) balloon 已知限制兩則：啟動期（VM 建構中）的 Notice 不彈 balloon（log 有記錄、開 Dashboard 可見）、同文字 Notice 連續發生不重彈；(g) mutex fail-open 啟動時失去單一實例保證（log 有 ERROR 記錄可佐證）。
 - **backlog（不阻塞，機會性處理）：** OnExit fallback 路徑不記「程式結束」log（極邊緣：非 tray 正常結束才走）。
+  - ✅ 已清償（Phase 12）：OnExit 保險路徑已補「程式結束（OnExit 保險路徑）」log。
 
 ---
 
