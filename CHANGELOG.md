@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-08-25
+
 ### 修正
 - 單一 EXE 在其他電腦啟動即 `DllNotFoundException` 閃退：WPF Native DLL（`*_cor3.dll`）先前未打進單檔，Release 只發佈 EXE 導致缺檔（dotnet/runtime#61279）。csproj 加入 `IncludeNativeLibrariesForSelfExtract=true`，並暫時關閉 `PublishReadyToRun` 排除相容性變因（重新啟用前須先通過獨立目錄啟動測試）。
 - `LogService.Error` 只記例外型別與 Message：改記 `ex.ToString()`，完整保留堆疊與 inner exception。
