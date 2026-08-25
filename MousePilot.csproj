@@ -9,7 +9,11 @@
 
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
-    <PublishReadyToRun>true</PublishReadyToRun>
+    <!-- WPF Native DLL（PresentationNative/wpfgfx/PenImc/D3DCompiler/vcruntime *_cor3.dll）必須打進單檔，
+         否則單獨散佈 EXE 會在其他電腦 DllNotFoundException 閃退（dotnet/runtime#61279）。 -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- 暫關 ReadyToRun：排除 R2R 與 WPF 單檔發佈的相容性變因；重新啟用前必須先通過獨立目錄啟動測試。 -->
+    <PublishReadyToRun>false</PublishReadyToRun>
 
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

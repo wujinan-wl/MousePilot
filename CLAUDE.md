@@ -27,7 +27,8 @@ dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=
 ```
 
 - Publish 產出位置：`bin\Release\net8.0-windows\win-x64\publish\MousePilot.exe`
-- csproj 關鍵屬性：`net8.0-windows`、`UseWPF`、`RuntimeIdentifier=win-x64`、`SelfContained`、`PublishSingleFile`、`PublishReadyToRun`（若造成 WPF/Native 問題可調整，需說明原因）。
+- csproj 關鍵屬性：`net8.0-windows`、`UseWPF`、`RuntimeIdentifier=win-x64`、`SelfContained`、`PublishSingleFile`、`IncludeNativeLibrariesForSelfExtract`（**必須為 true**——否則 WPF Native DLL `*_cor3.dll` 不進單檔，單獨散佈 EXE 會在其他電腦 DllNotFoundException 閃退，dotnet/runtime#61279）、`PublishReadyToRun`（目前 false，排除 R2R 與 WPF 單檔相容性變因；重新啟用前必須先通過 `tools/publish-smoke-test.ps1` 獨立目錄啟動測試）。
+- Release 前 CI 會跑 `tools/publish-smoke-test.ps1`：publish 目錄不得殘留 `*_cor3.dll`，且只複製 MousePilot.exe 到全新目錄須能啟動並在 log 留下「程式啟動」標記。
 
 ## 架構
 

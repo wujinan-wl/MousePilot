@@ -31,6 +31,13 @@ jobs:
       - name: Publish single EXE
         run: dotnet publish MousePilot.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
 
+      # 獨立目錄啟動驗證（防 dotnet/runtime#61279 回歸）：
+      # publish 目錄不得殘留 *_cor3.dll；只複製 MousePilot.exe 到全新目錄啟動，
+      # 程序須存活且 log 出現「程式啟動」成功標記，否則 CI 失敗、不得發佈。
+      - name: Standalone EXE smoke test
+        shell: pwsh
+        run: ./tools/publish-smoke-test.ps1 -PublishDir bin/Release/net8.0-windows/win-x64/publish -WaitSeconds 10
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
