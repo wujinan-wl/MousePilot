@@ -15,6 +15,8 @@ public partial class App : Application
     private LogService? _logService;
     private bool _exiting;
 
+    private string? _bootstrapLogPath;
+
     public App()
     {
         // 極早期開機紀錄（診斷用）：App 建構子是受控程式碼第一站——這行有寫出代表 .NET/WPF host 啟動成功，
@@ -25,19 +27,8 @@ public partial class App : Application
         DispatcherUnhandledException += (_, args) => BootTrace($"Dispatcher 例外：{args.Exception}");
     }
 
-    private static void BootTrace(string message)
-    {
-        try
-        {
-            System.IO.File.AppendAllText(
-                System.IO.Path.Combine(System.IO.Path.GetTempPath(), "mousepilot-boot.log"),
-                $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}");
-        }
-        catch
-        {
-            // 診斷紀錄不得反噬
-        }
-    }
+    private void BootTrace(string message)
+        => _bootstrapLogPath = BootstrapLog.Write(message) ?? _bootstrapLogPath;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -50,6 +41,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             // 啟動期任何未預期例外：確保留下紀錄並讓使用者看得到（Win10 實機曾發生早期 crash 無任何線索）
+            BootTrace($"OnStartup 例外：{ex}"); // 正式 log 不可用時（AppData 異常）bootstrap log 仍留完整堆疊
             (_logService ?? new LogService()).Error("啟動失敗（OnStartup）", ex);
             try { _cursorService?.Restore(); } catch { /* 最後防線內不得再拋 */ }
             MessageBox.Show($"MousePilot 啟動失敗：\n{ex}", "MousePilot", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -83,6 +75,7 @@ public partial class App : Application
 
         _logService = new LogService(); // mutex 取得之後才建——第二實例不記 log
         _logService.Info("啟動階段：單一實例通過");
+        _logService.Info($"啟動階段：bootstrap log 位置：{_bootstrapLogPath ?? "（寫入失敗）"}");
 
         if (_singleInstance.AcquiredViaFailOpen)
         {
@@ -100,10 +93,12 @@ public partial class App : Application
 
         var vm = new MainViewModel(new SettingsService(), cursorService: _cursorService, logService: _logService); // 區域變數供 lambda 捕捉（避免 nullable 欄位的 CS8602 警告）
         _mainViewModel = vm;
+        BootTrace("服務初始化完成");
         _logService.Info("啟動階段：服務初始化完成");
         var window = new MainWindow { DataContext = vm };
         MainWindow = window;
         window.Closing += OnMainWindowClosing;
+        BootTrace("主視窗建立完成");
         _logService.Info("啟動階段：主視窗建立完成");
 
         _tray = new TrayIconService();
@@ -117,6 +112,7 @@ public partial class App : Application
         _tray.RestoreCursorRequested += () => vm.RestoreCursorCommand.Execute(null);
         vm.PropertyChanged += OnViewModelPropertyChanged;
         _tray.UpdateStatus(vm.Status, vm.StatusText);
+        BootTrace("系統匣就緒");
         _logService.Info("啟動階段：系統匣就緒");
 
         _singleInstance.WakeRequested += () => Dispatcher.BeginInvoke(ShowDashboard); // BeginInvoke：dispatcher 關閉時靜默 abort，不丟例外（review 修正）

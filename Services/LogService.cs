@@ -28,7 +28,7 @@ public class LogService
     public void Info(string message) => Write("INFO", message);
 
     public void Error(string message, Exception? ex = null)
-        => Write("ERROR", ex is null ? message : $"{message}｜{ex.GetType().Name}: {ex.Message}");
+        => Write("ERROR", ex is null ? message : $"{message}｜{ex}"); // ex.ToString()：含型別、Message、完整堆疊與 inner exception（啟動 crash 診斷必要）
 
     private void Write(string level, string message)
     {

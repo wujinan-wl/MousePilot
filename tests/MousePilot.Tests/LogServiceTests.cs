@@ -33,6 +33,33 @@ public sealed class LogServiceTests : IDisposable
     }
 
     [Fact]
+    public void Error保留完整StackTrace與InnerException()
+    {
+        Exception caught = null!;
+        try
+        {
+            try
+            {
+                throw new IOException("inner-detail");
+            }
+            catch (IOException inner)
+            {
+                throw new InvalidOperationException("outer", inner);
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            caught = ex;
+        }
+
+        Create().Error("啟動失敗", caught);
+
+        var text = File.ReadAllText(Path.Combine(_dir, "mousepilot.log"));
+        Assert.Contains("at MousePilot.Tests.LogServiceTests", text); // 堆疊框架（規格：不可只記例外型別與 Message）
+        Assert.Contains("inner-detail", text);                         // inner exception 一併保留
+    }
+
+    [Fact]
     public void 超過大小觸發輪替鏈()
     {
         var log = Create(maxBytes: 100);

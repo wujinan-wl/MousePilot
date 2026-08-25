@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+### 修正
+- 單一 EXE 在其他電腦啟動即 `DllNotFoundException` 閃退：WPF Native DLL（`*_cor3.dll`）先前未打進單檔，Release 只發佈 EXE 導致缺檔（dotnet/runtime#61279）。csproj 加入 `IncludeNativeLibrariesForSelfExtract=true`，並暫時關閉 `PublishReadyToRun` 排除相容性變因（重新啟用前須先通過獨立目錄啟動測試）。
+- `LogService.Error` 只記例外型別與 Message：改記 `ex.ToString()`，完整保留堆疊與 inner exception。
+
+### 新增
+- Bootstrap log（`BootstrapLog`）：極早期開機紀錄改寫至 `%AppData%\MousePilot\Logs\mousepilot-bootstrap.log`（不可用時退回 `%TEMP%`），記錄 App 建構子／OnStartup／服務初始化／主視窗／系統匣各階段；成功啟動後於正式 log 記錄 bootstrap log 位置；寫入失敗一律靜默，超過 512KB 重寫防 crash loop 無限成長。
+- Publish smoke test（`tools/publish-smoke-test.ps1`）：驗證 publish 目錄無 `*_cor3.dll` 殘留、只複製 MousePilot.exe 至全新目錄可啟動、log 出現「程式啟動」成功標記才算通過；Release workflow 於發佈前強制執行，未通過不得發佈。
+- 單元測試：`LogService.Error` 完整堆疊、BootstrapLog 主/備援路徑與靜默失敗（新增 5 項，總數 271→276）。
+
 ## [1.0.0] - 2026-08-24
 
 ### 新增
