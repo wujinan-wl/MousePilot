@@ -1,5 +1,10 @@
 # MousePilot 常見問題（FAQ）
 
+## MousePilot 打不開或一啟動就閃退，怎麼排查？
+
+1. 先確認下載的是 **v1.0.1 或之後**的版本：v1.0.0 的單一 EXE 缺少內嵌的 WPF 原生元件，在部分電腦上會啟動即閃退（`DllNotFoundException`），v1.0.1 已修正——重新從 [GitHub Releases](https://github.com/wujinan-wl/MousePilot/releases) 下載最新版即可。
+2. 若最新版仍無法啟動，查看 `%AppData%\MousePilot\Logs\` 下的兩個檔案：`mousepilot.log`（正式 Log）與 `mousepilot-bootstrap.log`（啟動診斷 Log，記錄啟動各階段與完整錯誤內容；若不存在，改找 `%TEMP%\mousepilot-bootstrap.log`）。回報問題時請附上這兩個檔案，詳見 `docs/debugging.md`。
+
 ## MousePilot 沒有觸發自動移動，為什麼？
 
 依序檢查：

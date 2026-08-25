@@ -14,9 +14,17 @@
    dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true
    ```
 
-   確認 0 error、0 warning，且於 `bin\Release\net8.0-windows\win-x64\publish\` 產出 `MousePilot.exe`。
+   確認 0 error、0 warning，且於 `bin\Release\net8.0-windows\win-x64\publish\` 產出 `MousePilot.exe`。**publish 目錄不得出現 `*_cor3.dll`**（WPF Native DLL 應已內嵌單檔；若出現代表 `IncludeNativeLibrariesForSelfExtract` 設定被改壞，單獨散佈 EXE 會在其他電腦閃退——v1.0.0 曾因此出包）。
 
-2. **乾淨環境驗證**：把上一步產出的 `MousePilot.exe` 複製到另一台**沒有安裝 .NET 8 Runtime** 的 Windows 10 或 Windows 11 x64 電腦（或乾淨的虛擬機），直接雙擊執行，確認可以正常啟動（self-contained + single-file 應無需額外安裝任何 Runtime）。
+2. **獨立目錄啟動驗證**（v1.0.1 起 Release CI 於發佈前自動執行；本機亦可跑）：
+
+   ```powershell
+   .\tools\publish-smoke-test.ps1
+   ```
+
+   通過標準：publish 目錄無 `*_cor3.dll` 殘留、只複製 `MousePilot.exe` 到全新目錄可啟動、正式 log 出現「程式啟動」標記。
+
+3. **乾淨環境驗證**：把上一步產出的 `MousePilot.exe` 複製到另一台**沒有安裝 .NET 8 Runtime** 的 Windows 10 或 Windows 11 x64 電腦（或乾淨的虛擬機），直接雙擊執行，確認可以正常啟動（self-contained + single-file 應無需額外安裝任何 Runtime）。若啟動失敗，檢查 `%AppData%\MousePilot\Logs\mousepilot-bootstrap.log` 的里程碑停在哪一階段（見 [Debug 方法](../debugging.md) §1.1a）。
 
 ## 1. §34 測試案例（全 31 項）
 

@@ -11,6 +11,13 @@
 - 輪替規則：目前 `mousepilot.log` 超過 **5 MB** 時觸發輪替——把現有歸檔依序往後遞增一個編號（超過保留數量的最舊一份會被刪除），再把目前的 `mousepilot.log` 更名為 `mousepilot.1.log`，程式繼續寫入全新的 `mousepilot.log`。
 - Log 寫入本身若失敗（例如檔案被占用、權限不足）會靜默略過，不會讓程式因為記錄失敗而中斷或當掉。
 
+### 1.1a Bootstrap Log（啟動診斷，v1.0.1 起）
+
+- 位置：`%AppData%\MousePilot\Logs\mousepilot-bootstrap.log`；若該位置不可寫，自動退回 `%TEMP%\mousepilot-bootstrap.log`。實際使用的位置會在成功啟動後記錄到正式 log（`啟動階段：bootstrap log 位置：…`）。
+- 用途：正式 LogService 建立**之前**的極早期紀錄。記錄啟動里程碑：`App ctor` → `OnStartup 進入` → `服務初始化完成` → `主視窗建立完成` → `系統匣就緒`；啟動期未處理例外也會連同**完整 stack trace** 寫入這裡。
+- **排查啟動閃退**：看 bootstrap log 最後一行停在哪個里程碑，即可定位 crash 發生的階段；一個里程碑都沒有代表 crash 在 .NET/WPF 原生初始化層（受控程式碼尚未執行）。
+- 不做輪替；超過 512KB 時整檔重寫（避免反覆 crash 使檔案無限成長）。寫入失敗一律靜默。
+
 ### 1.2 記錄項目
 
 依規格會記錄以下七類事件（不含逐次滑鼠移動，避免 Log 無限增長）：
@@ -20,7 +27,7 @@
 3. Cursor 套用錯誤（`SetSystemCursor` 失敗、寫入 confirmed 游標檔失敗等）
 4. Registry 錯誤（開機自啟寫入/移除失敗）
 5. Global Hotkey 錯誤（格式無效、占用、Win32 錯誤碼）
-6. 未處理例外（Dispatcher / AppDomain 層級的 `EmergencyShutdown`）
+6. 未處理例外（Dispatcher / AppDomain 層級的 `EmergencyShutdown`；v1.0.1 起記錄完整 `ex.ToString()`——含例外型別、訊息、stack trace 與 inner exception，不再只有型別與訊息）
 7. 其他關鍵事件：滑鼠移動連續失敗達 3 次進入錯誤狀態、Session 結束（登出/關機）恢復游標、單一實例 fail-open 等
 
 ### 1.3 讀 log 的方式
@@ -101,7 +108,7 @@ MousePilot 使用具名 Mutex 判斷是否已有實例在跑。正常情況下�
 
 回報 Issue 或尋求協助時，建議附上：
 
-1. `%AppData%\MousePilot\Logs\mousepilot.log`（以及若有異常時段更早的 `mousepilot.1.log` 等歸檔）。
+1. `%AppData%\MousePilot\Logs\mousepilot.log`（以及若有異常時段更早的 `mousepilot.1.log` 等歸檔）；**若是啟動失敗/閃退問題**，另附 `mousepilot-bootstrap.log`（同目錄；若不存在則找 `%TEMP%\mousepilot-bootstrap.log`）。
 2. Windows 版本（Windows 10 或 11、build 號碼，`winver` 可查）。
 3. 具體重現步驟（操作順序、期望結果與實際結果的差異）。
 4. 若與游標相關：目前使用的游標來源（內建圖案 / 匯入圖片 / `.cur`/`.ani` 檔）與尺寸設定。
@@ -128,6 +135,16 @@ dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=
   ```
   bin\Release\net8.0-windows\win-x64\publish\MousePilot.exe
   ```
+
+  publish 目錄應**只有** `MousePilot.exe`（與 `.pdb`）——WPF Native DLL（`*_cor3.dll`）已透過 `IncludeNativeLibrariesForSelfExtract` 內嵌進單檔。若目錄出現 `*_cor3.dll`，代表單檔封裝設定被改壞，單獨散佈 EXE 會在其他電腦 `DllNotFoundException` 閃退（dotnet/runtime#61279）。
+
+- 獨立目錄啟動驗證（Release CI 會自動執行，本機也可跑）：
+
+  ```powershell
+  .\tools\publish-smoke-test.ps1
+  ```
+
+  檢查 publish 目錄無 `*_cor3.dll` 殘留 → 只複製 EXE 到全新暫存目錄啟動 → 輪詢正式 log 出現「程式啟動」標記（至多 90 秒）→ 安全結束。注意：使用真實 `%AppData%`，且 MousePilot 執行中時會主動中止（單一實例會讓測試實例讓路）。
 
 ### 7.3 測試專案
 

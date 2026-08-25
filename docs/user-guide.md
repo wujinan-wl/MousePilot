@@ -173,6 +173,7 @@ MousePilot 有兩種通知管道：
 | `settings.json` | 所有使用者設定（閒置秒數、快捷鍵、游標設定等）。 |
 | `Logs\mousepilot.log` | 目前的執行 Log，超過 5MB 會輪替歸檔。 |
 | `Logs\mousepilot.1.log` ~ `mousepilot.3.log` | 歷史 Log 歸檔（最多保留 3 份，`.1` 為最新）。 |
+| `Logs\mousepilot-bootstrap.log` | 啟動診斷 Log（v1.0.1 起）：記錄啟動各階段里程碑與啟動期例外的完整內容，排查「程式打不開/一開就閃退」時查看此檔。 |
 | `Cursors\` | 使用者匯入的游標圖片/檔案儲存位置。 |
 | `confirmed-cursor.cur` | 目前「確定」/「套用」所使用的最終游標檔（放在根目錄，不會出現在圖案清單中）。 |
 | `cursor-applied.marker` | 內部狀態檔：存在代表「游標已套用但尚未正常恢復」，供程式異常結束後下次啟動自動補救。 |

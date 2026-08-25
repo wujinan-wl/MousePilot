@@ -16,7 +16,7 @@ Windows 桌面小工具：閒置一段時間後自動微移滑鼠，避免筆電
 - **全域快捷鍵**：預設 `Ctrl+Alt+F9`（啟動/暫停）、`Ctrl+Alt+F10`（恢復 Windows 游標），可自訂錄製。
 - **自訂游標匯入與編輯**：支援 PNG/JPG/JPEG/BMP/CUR/ANI 匯入、Hotspot 點擊編輯、JPG 去背、模擬預覽、全域套用與安全恢復（`SPI_SETCURSORS`，crash/登出/關機皆會恢復）。
 - **單一實例**：per-user 只允許一份執行，第二次啟動會喚醒原視窗；不同 Windows 使用者可各自執行一份。
-- **Log 紀錄**：關鍵事件寫入 `%AppData%\MousePilot\Logs\mousepilot.log`，5MB 輪替、保留 3 份歸檔。
+- **Log 紀錄**：關鍵事件寫入 `%AppData%\MousePilot\Logs\mousepilot.log`，5MB 輪替、保留 3 份歸檔；另有啟動診斷 log（`mousepilot-bootstrap.log`）記錄啟動各階段與完整錯誤內容，啟動失敗也一定留得下線索。
 
 ## 系統需求
 
