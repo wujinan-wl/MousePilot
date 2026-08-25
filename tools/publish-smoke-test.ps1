@@ -2,14 +2,14 @@
 # 步驟：
 #   1. publish 目錄不得殘留 *_cor3.dll（WPF Native DLL 必須已打進單檔）。
 #   2. 將 MousePilot.exe 單獨複製到全新暫存目錄並啟動。
-#   3. 等待 N 秒：程序提前退出 → 失敗。
-#   4. 正式 log 必須出現「[INFO] 程式啟動」成功標記（程序活著≠啟動成功——啟動失敗會停在阻塞的 MessageBox）。
+#   3. 輪詢至多 N 秒：程序提前退出 → 失敗；正式 log 出現「[INFO] 程式啟動」成功標記 → 通過。
+#      （程序活著≠啟動成功——啟動失敗會停在阻塞的 MessageBox；固定短等待會與 CI 冷機 JIT 速度賽跑，故用輪詢）
 #   5. 安全結束程序；本機執行時另跑 --restore-cursor 保險（強制結束不會走游標恢復流程）。
 # 注意：本測試使用真實 %AppData%\MousePilot（程式的 log 位置無法重導向）；若本機已有 MousePilot 在執行，
 #       單一實例機制會讓測試實例立即讓路，因此偵測到既有程序即中止測試。
 param(
     [string]$PublishDir = "bin\Release\net8.0-windows\win-x64\publish",
-    [int]$WaitSeconds = 10
+    [int]$TimeoutSeconds = 90
 )
 
 $ErrorActionPreference = "Stop"
@@ -49,29 +49,39 @@ Copy-Item $exe -Destination $standaloneDir
 $standaloneExe = Join-Path $standaloneDir "MousePilot.exe"
 Write-Host "[2/4] 已複製 EXE 至獨立目錄：$standaloneDir" -ForegroundColor Green
 
-# 3. 啟動並等待：紀錄啟動前 log 內容，之後只認「新寫入」的成功標記
+# 3. 啟動並輪詢：紀錄啟動前 log 內容，之後只認「新寫入」的成功標記
 $mainLog = Join-Path $env:APPDATA "MousePilot\Logs\mousepilot.log"
 $preContent = if (Test-Path $mainLog) { Get-Content $mainLog -Raw -Encoding UTF8 } else { "" }
 
+function Get-NewLogContent {
+    $postContent = if (Test-Path $mainLog) { Get-Content $mainLog -Raw -Encoding UTF8 } else { "" }
+    if ($postContent.Length -ge $preContent.Length -and $postContent.StartsWith($preContent)) {
+        $postContent.Substring($preContent.Length)   # 只看本次啟動新增的內容
+    } else {
+        $postContent                                  # log 已輪替：退而搜尋全文
+    }
+}
+
 $proc = Start-Process -FilePath $standaloneExe -WorkingDirectory $standaloneDir -PassThru
-Write-Host "已啟動 PID $($proc.Id)，等待 $WaitSeconds 秒..."
-Start-Sleep -Seconds $WaitSeconds
-
-if ($proc.HasExited) {
-    Fail "程序在 $WaitSeconds 秒內提前退出（ExitCode=$($proc.ExitCode)）"
+Write-Host "已啟動 PID $($proc.Id)，輪詢成功標記（至多 $TimeoutSeconds 秒）..."
+$sw = [Diagnostics.Stopwatch]::StartNew()
+$started = $false
+while ($sw.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+    if ($proc.HasExited) {
+        Fail "程序在 $([int]$sw.Elapsed.TotalSeconds) 秒時提前退出（ExitCode=$($proc.ExitCode)）"
+    }
+    if ((Get-NewLogContent) -match "\[INFO\] 程式啟動") {
+        $started = $true
+        break
+    }
+    Start-Sleep -Seconds 2
 }
 
-$postContent = if (Test-Path $mainLog) { Get-Content $mainLog -Raw -Encoding UTF8 } else { "" }
-$newContent = if ($postContent.Length -ge $preContent.Length -and $postContent.StartsWith($preContent)) {
-    $postContent.Substring($preContent.Length)   # 只看本次啟動新增的內容
-} else {
-    $postContent                                  # log 已輪替：退而搜尋全文
-}
-if ($newContent -notmatch "\[INFO\] 程式啟動") {
+if (-not $started) {
     try { Stop-Process -Id $proc.Id -Force } catch {}
-    Fail "程序存活但 log 未出現「程式啟動」成功標記（可能停在啟動失敗的 MessageBox）"
+    Fail "程序存活但 $TimeoutSeconds 秒內 log 未出現「程式啟動」成功標記（可能卡住或停在啟動失敗的 MessageBox）"
 }
-Write-Host "[3/4] 程序存活且 log 出現「程式啟動」成功標記" -ForegroundColor Green
+Write-Host "[3/4] 程序於 $([int]$sw.Elapsed.TotalSeconds) 秒內完成啟動（log 出現「程式啟動」標記）" -ForegroundColor Green
 
 # 4. 安全結束與清理
 Stop-Process -Id $proc.Id -Force

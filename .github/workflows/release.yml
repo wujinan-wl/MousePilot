@@ -36,7 +36,7 @@ jobs:
       # 程序須存活且 log 出現「程式啟動」成功標記，否則 CI 失敗、不得發佈。
       - name: Standalone EXE smoke test
         shell: pwsh
-        run: ./tools/publish-smoke-test.ps1 -PublishDir bin/Release/net8.0-windows/win-x64/publish -WaitSeconds 10
+        run: ./tools/publish-smoke-test.ps1 -PublishDir bin/Release/net8.0-windows/win-x64/publish -TimeoutSeconds 90
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
