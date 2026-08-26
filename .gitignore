@@ -11,8 +11,14 @@ publish/
 # 個人工作偏好（不公開）
 CLAUDE-preferences.md
 
+# AI 助理設定與開發過程文件（本機保留，不隨 repo 公開）
+CLAUDE.md
+.claude/
+docs/superpowers/
+
 # Codex 本機複本（非本專案交付物）
 AGENTS.md
+.codex/
 
 # Python scaffold 殘留
 .venv/

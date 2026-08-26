@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+### 移除
+- 公開 repo 清理：AI 助理設定（CLAUDE.md）與開發過程文件（docs/superpowers/ 各 Phase 計畫與 Spike 研究紀錄）移出版本控制，僅保留本機；.gitignore 補上對應規則防止再次提交。
+
 ### 文件
 - 文件同步 v1.0.1 變更：debugging.md 新增 §1.1a Bootstrap Log 說明（位置/里程碑/閃退排查）與 publish 產物、smoke test 驗證說明；FAQ 與線上手冊新增「打不開/閃退」排查條目（提醒升級 v1.0.1、附 bootstrap log 回報）；user-guide 資料位置表補 `mousepilot-bootstrap.log`；README Log 條目補啟動診斷；發布驗證清單前置補 `*_cor3.dll` 檢查與獨立目錄啟動驗證步驟。
 
